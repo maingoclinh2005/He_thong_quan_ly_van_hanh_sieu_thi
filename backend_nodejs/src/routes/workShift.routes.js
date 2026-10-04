@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { assertCanStartShift } = require('./employeeSchedule.routes');
+const { requireAuth, requireRoles, requireSelfOrRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
@@ -85,7 +86,7 @@ async function workShiftHasStatus(connection) {
   return Number(rows[0]?.count || 0) > 0;
 }
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
     const employeeId = Number(req.query.employee_id || req.query.employeeId);
     const status = (req.query.status || '').toString().toLowerCase();
@@ -141,7 +142,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/employee/:employeeId', async (req, res) => {
+router.get('/employee/:employeeId', requireAuth, requireSelfOrRoles('admin'), async (req, res) => {
   try {
     const employeeId = Number(req.params.employeeId);
     if (!employeeId) {
@@ -181,12 +182,15 @@ router.get('/employee/:employeeId', async (req, res) => {
   }
 });
 
-router.post('/start', async (req, res) => {
+router.post('/start', requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const employeeId = Number(req.body.employee_id);
     if (!employeeId) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập employee_id' });
+    }
+    if (req.user.role_name !== 'admin' && Number(req.user.user_id) !== employeeId) {
+      return res.status(403).json({ success: false, message: 'Bạn chỉ có thể bắt đầu ca của chính mình' });
     }
 
     const employee = await findEmployee(employeeId);
@@ -246,12 +250,15 @@ router.post('/start', async (req, res) => {
   }
 });
 
-router.post('/end', async (req, res) => {
+router.post('/end', requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const employeeId = Number(req.body.employee_id);
     if (!employeeId) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập employee_id' });
+    }
+    if (req.user.role_name !== 'admin' && Number(req.user.user_id) !== employeeId) {
+      return res.status(403).json({ success: false, message: 'Bạn chỉ có thể kết thúc ca của chính mình' });
     }
 
     await connection.beginTransaction();

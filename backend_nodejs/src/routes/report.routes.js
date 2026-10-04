@@ -1,41 +1,8 @@
 const express = require("express");
 const pool = require("../config/db");
+const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
-
-async function requireAdmin(req, res, next) {
-  try {
-    const userId = Number(req.get("x-user-id"));
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Thiếu thông tin admin",
-      });
-    }
-
-    const [users] = await pool.execute(
-      `SELECT u.user_id
-       FROM users u
-       JOIN roles r ON r.role_id = u.role_id
-       WHERE u.user_id = ? AND r.role_name = 'admin' AND u.status = 'active'`,
-      [userId],
-    );
-
-    if (users.length === 0) {
-      return res.status(403).json({
-        success: false,
-        message: "Chỉ admin được xem báo cáo",
-      });
-    }
-    next();
-  } catch (error) {
-    return res.status(403).json({
-      success: false,
-      message: "Không kiểm tra được quyền admin",
-      error: error.message,
-    });
-  }
-}
 
 const paidOrderCondition = "o.payment_status IN ('paid', 'success')";
 
@@ -57,7 +24,7 @@ const latestImportPriceSql = `
   FROM inventory_items ii
 `;
 
-router.use(requireAdmin);
+router.use(requireAuth, requireRoles('admin'));
 
 function groupRevenueByPeriod(periodExpr) {
   return `SELECT

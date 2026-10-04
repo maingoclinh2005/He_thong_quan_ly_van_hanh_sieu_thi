@@ -2,21 +2,16 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/voucher.dart';
 import 'api_service.dart';
-import 'db_service.dart'; // Import để lấy token & user_id từ Hive
 
 class VoucherService {
   static String get baseUrl => '${ApiService.baseUrl}/api/vouchers';
   static const Duration timeoutDuration = Duration(seconds: 10);
 
-  // Helper: Get auth headers với token + user_id
+  // Identity comes exclusively from the signed Bearer token.
   static Map<String, String> _getAuthHeaders(String token) {
-    final settings = DBService.settings();
-    final userId = settings.get('current_user_id') ?? '0';
-
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
-      'x-user-id': userId.toString(),
     };
   }
 

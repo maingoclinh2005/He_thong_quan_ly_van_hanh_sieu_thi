@@ -1,10 +1,11 @@
 const express = require('express');
 const pool = require('../config/db');
 const loyalty = require('../services/loyalty.service');
+const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
-router.get('/customer', async (req, res) => {
+router.get('/customer', requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   const phone = loyalty.normalizePhone(req.query.phone);
   const amountAfterVoucher =
     req.query.amount_after_voucher ??
@@ -62,11 +63,11 @@ router.get('/customer', async (req, res) => {
   }
 });
 
-router.post('/add', async (req, res) => {
+router.post('/add', requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   const customerName = String(req.body.customerName || req.body.customer_name || '').trim();
   const phone = loyalty.normalizePhone(req.body.phone);
   const amount = Number(req.body.amount || 0);
-  const employeeId = Number(req.body.employeeId || req.body.employee_id || 0) || null;
+  const employeeId = req.user.role_name === 'employee' ? Number(req.user.user_id) : null;
   const orderId = Number(req.body.orderId || req.body.order_id || 0) || null;
 
   if (!customerName) {

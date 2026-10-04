@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../config/db');
+const { requireAuth, requireRoles, requireSelfOrRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
@@ -142,7 +143,7 @@ async function assertCanStartShift(employeeId, workDate) {
   return { ok: true };
 }
 
-router.get('/employee/:employeeId/month', async (req, res) => {
+router.get('/employee/:employeeId/month', requireAuth, requireSelfOrRoles('admin'), async (req, res) => {
   try {
     const employeeId = Number(req.params.employeeId);
     const now = new Date();
@@ -225,7 +226,7 @@ router.get('/employee/:employeeId/month', async (req, res) => {
   }
 });
 
-router.put('/employee/:employeeId/day', async (req, res) => {
+router.put('/employee/:employeeId/day', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
     if (!(await tableExists('employee_day_overrides'))) {
       return res.status(500).json({
@@ -238,7 +239,7 @@ router.put('/employee/:employeeId/day', async (req, res) => {
     const workDate = req.body.work_date || req.body.workDate;
     const dayStatus = (req.body.day_status || req.body.dayStatus || '').toString().toLowerCase();
     const note = req.body.note || null;
-    const setBy = req.body.set_by || req.body.setBy || null;
+    const setBy = req.user.user_id;
 
     if (!workDate) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập work_date' });
@@ -297,7 +298,7 @@ router.put('/employee/:employeeId/day', async (req, res) => {
   }
 });
 
-router.get('/overview/month', async (req, res) => {
+router.get('/overview/month', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
     const now = new Date();
     const year = Number(req.query.year) || now.getFullYear();

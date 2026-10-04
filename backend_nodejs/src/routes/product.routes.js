@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../config/db');
+const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
@@ -62,7 +63,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/scan/:code', async (req, res) => {
+router.get('/scan/:code', requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   try {
     const code = req.params.code.trim();
     if (!code) {
@@ -127,7 +128,7 @@ router.get('/scan/:code', async (req, res) => {
   }
 });
 
-router.get('/check-code/:code', async (req, res) => {
+router.get('/check-code/:code', requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   try {
     const code = (req.params.code || '').trim();
     if (!code) {
@@ -155,7 +156,7 @@ router.get('/check-code/:code', async (req, res) => {
   }
 });
 
-router.post('/generate-code', async (req, res) => {
+router.post('/generate-code', requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   try {
     const { prefix } = req.body;
     let codePrefix = String(prefix || 'SP').trim().toUpperCase();
@@ -202,7 +203,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
     const {
       product_name,
@@ -280,7 +281,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
     const {
       product_name,
@@ -364,7 +365,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
     await pool.execute("UPDATE products SET status = 'deleted' WHERE product_id = ?", [req.params.id]);
     res.json({ success: true, message: 'Đã xóa sản phẩm' });

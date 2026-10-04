@@ -1,10 +1,17 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'mini_market_secret';
+const JWT_SECRET = String(process.env.JWT_SECRET || '').trim();
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const RESET_TOKEN_EXPIRES_IN = process.env.RESET_TOKEN_EXPIRES_IN || '15m';
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 10);
+
+function requireJwtSecret() {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET chưa được cấu hình');
+  }
+  return JWT_SECRET;
+}
 
 function isBcryptHash(value) {
   return typeof value === 'string' && /^\$2[aby]\$\d{2}\$/.test(value);
@@ -30,7 +37,7 @@ function signAuthToken(user) {
       email: user.email,
       role_name: user.role_name,
     },
-    JWT_SECRET,
+    requireJwtSecret(),
     { expiresIn: JWT_EXPIRES_IN }
   );
 }
@@ -43,13 +50,13 @@ function signResetToken(resetToken) {
       user_id: resetToken.user_id,
       type: resetToken.type,
     },
-    JWT_SECRET,
+    requireJwtSecret(),
     { expiresIn: RESET_TOKEN_EXPIRES_IN }
   );
 }
 
 function verifyResetToken(token) {
-  const payload = jwt.verify(token, JWT_SECRET);
+  const payload = jwt.verify(token, requireJwtSecret());
   if (payload.purpose !== 'password_reset') {
     throw new Error('Token đặt lại mật khẩu không hợp lệ');
   }

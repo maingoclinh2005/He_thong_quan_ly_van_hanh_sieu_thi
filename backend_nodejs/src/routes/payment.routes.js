@@ -1,6 +1,6 @@
 const express = require("express");
 const pool = require("../config/db");
-const { requireAuth } = require("../middlewares/auth.middleware");
+const { requireAuth, requireRoles } = require("../middlewares/auth.middleware");
 const vnpay = require("../services/vnpay.service");
 const orderPayment = require("../services/order-payment.service");
 
@@ -13,7 +13,7 @@ function digitsOnly(value) {
 }
 
 function currentUserId(req) {
-  return Number(req.user?.id || req.user?.user_id || req.get("x-user-id"));
+  return Number(req.user?.id || req.user?.user_id);
 }
 
 function clientIp(req) {
@@ -523,7 +523,7 @@ async function bankWebhookHandler(req, res) {
 router.post("/bank-webhook", bankWebhookHandler);
 router.post("/sepay", bankWebhookHandler);
 
-router.post("/bank-transfer/manual-confirm", requireAuth, async (req, res) => {
+router.post("/bank-transfer/manual-confirm", requireAuth, requireRoles('admin'), async (req, res) => {
   const userId = currentUserId(req);
   const orderId = Number(req.body.order_id || req.body.orderId);
   if (!userId) {
