@@ -1,6 +1,14 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 
+function getJwtSecret() {
+  const secret = String(process.env.JWT_SECRET || '').trim();
+  if (!secret) {
+    throw new Error('JWT_SECRET chưa được cấu hình');
+  }
+  return secret;
+}
+
 async function loadUser(userId) {
   const [users] = await pool.execute(
     `SELECT u.user_id, u.full_name, u.email, u.phone, u.address, u.points,
@@ -21,11 +29,10 @@ async function loadUser(userId) {
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
   const [scheme, token] = authHeader.split(' ');
-  const headerUserId = Number(req.get('x-user-id'));
 
   if (scheme === 'Bearer' && token) {
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET || 'mini_market_secret');
+      const payload = jwt.verify(token, getJwtSecret());
       const user = await loadUser(payload.id || payload.user_id);
       if (!user) {
         return res.status(401).json({ success: false, message: 'Tài khoản không hợp lệ' });
@@ -37,23 +44,7 @@ async function requireAuth(req, res, next) {
     }
   }
 
-  // Dev/backward-compatible fallback for old Flutter calls. Prefer Bearer token.
-  if (headerUserId && process.env.ALLOW_HEADER_USER_AUTH !== 'false') {
-    try {
-      const user = await loadUser(headerUserId);
-      if (!user) {
-        return res.status(401).json({ success: false, message: 'Tài khoản không hợp lệ' });
-      }
-      req.user = user;
-      return next();
-    } catch (error) {
-      return res.status(401).json({ success: false, message: 'Không kiểm tra được đăng nhập' });
-    }
-  }
-
-  if (scheme !== 'Bearer' || !token) {
-    return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập' });
-  }
+  return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập bằng Bearer token hợp lệ' });
 }
 
 function requireRoles(...roles) {
@@ -65,4 +56,15 @@ function requireRoles(...roles) {
   };
 }
 
-module.exports = { requireAuth, requireRoles };
+function requireSelfOrRoles(...roles) {
+  return (req, res, next) => {
+    const requestedId = Number(req.params.userId || req.params.employeeId || req.params.id);
+    const currentUserId = Number(req.user?.user_id || req.user?.id);
+    if (roles.includes(req.user?.role_name) || (requestedId && requestedId === currentUserId)) {
+      return next();
+    }
+    return res.status(403).json({ success: false, message: 'Bạn không có quyền truy cập dữ liệu của người dùng này' });
+  };
+}
+
+module.exports = { requireAuth, requireRoles, requireSelfOrRoles };

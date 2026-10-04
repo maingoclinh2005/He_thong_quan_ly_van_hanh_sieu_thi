@@ -12,7 +12,6 @@ import '../models/user.dart';
 import '../models/inventory_item.dart';
 import 'db_service.dart';
 import '../utils/constants.dart';
-import '../utils/type_converters.dart';
 
 // Ca làm / tổng hợp nhân viên có thể chậm hơn API thông thường.
 Duration get _shiftTimeout =>
@@ -28,7 +27,6 @@ class ApiException implements Exception {
 
 class ApiService {
   static const Duration _timeout = Duration(seconds: 5);
-  static int? _currentUserId;
 
   static String get baseUrl {
     const configured = String.fromEnvironment('API_BASE_URL');
@@ -107,19 +105,11 @@ class ApiService {
 
   static Map<String, String> get _userHeaders => {
     ..._authHeaders,
-    if ((_currentUserId ?? DBService.currentUserId()) != null)
-      'x-user-id': (_currentUserId ?? DBService.currentUserId()).toString(),
   };
 
-  static Map<String, String> _userHeadersFor(int userId) => {
-    ..._authHeaders,
-    'x-user-id': userId.toString(),
-  };
+  static Map<String, String> _userHeadersFor(int userId) => _authHeaders;
 
-  static Map<String, String> _adminHeaders(int adminUserId) => {
-    ..._authHeaders,
-    'x-user-id': adminUserId.toString(),
-  };
+  static Map<String, String> _adminHeaders(int adminUserId) => _authHeaders;
 
   static dynamic _decode(http.Response response) {
     final body = response.body.isEmpty
@@ -168,9 +158,6 @@ class ApiService {
     if (token != null && token.isNotEmpty) {
       await DBService.settings().put('auth_token', token);
     }
-    _currentUserId = TypeConverters.toNullableInt(
-      user['user_id'] ?? user['userId'],
-    );
     return user;
   }
 
@@ -257,7 +244,7 @@ class ApiService {
   }
 
   static Future<List<User>> fetchUsers() async {
-    final response = await http.get(_uri('/api/users')).timeout(_timeout);
+    final response = await http.get(_uri('/api/users'), headers: _authHeaders).timeout(_timeout);
     final body = _decode(response);
     return _dataList(
       body,
@@ -312,7 +299,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> fetchEmployeeSummary(int userId) async {
     final response = await http
-        .get(_uri('/api/users/$userId/employee-summary'))
+        .get(_uri('/api/users/$userId/employee-summary'), headers: _authHeaders)
         .timeout(_shiftTimeout);
     return _dataMap(_decode(response));
   }
@@ -327,6 +314,7 @@ class ApiService {
           _uri(
             '/api/employee-schedules/employee/$employeeId/month?year=$year&month=$month',
           ),
+          headers: _authHeaders,
         )
         .timeout(_shiftTimeout);
     final body = _dataMap(_decode(response));
@@ -343,7 +331,7 @@ class ApiService {
     final response = await http
         .put(
           _uri('/api/employee-schedules/employee/$employeeId/day'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode({
             'work_date': workDate,
             'day_status': dayStatus,
@@ -364,6 +352,7 @@ class ApiService {
           _uri(
             '/api/employee-schedules/overview/month?year=$year&month=$month',
           ),
+          headers: _authHeaders,
         )
         .timeout(_shiftTimeout);
     final body = _dataMap(_decode(response));
@@ -382,6 +371,7 @@ class ApiService {
     final response = await http
         .get(
           _uri('/api/work-shifts/employee/$employeeId?year=$year&month=$month'),
+          headers: _authHeaders,
         )
         .timeout(_shiftTimeout);
     final body = _decode(response);
@@ -401,7 +391,7 @@ class ApiService {
       if (dateFilter != 'all') 'date_filter': dateFilter,
     };
     final uri = _uri('/api/work-shifts').replace(queryParameters: query);
-    final response = await http.get(uri).timeout(_shiftTimeout);
+    final response = await http.get(uri, headers: _authHeaders).timeout(_shiftTimeout);
     final body = _decode(response);
     return _dataList(body)
         .map((e) => WorkShift.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -412,7 +402,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/work-shifts/start'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode({'employee_id': employeeId}),
         )
         .timeout(_shiftTimeout);
@@ -423,7 +413,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/work-shifts/end'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode({'employee_id': employeeId}),
         )
         .timeout(_shiftTimeout);
@@ -449,7 +439,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/categories'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode({'category_name': name}),
         )
         .timeout(_timeout);
@@ -468,7 +458,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/products'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode(product.toJson()),
         )
         .timeout(_timeout);
@@ -479,7 +469,7 @@ class ApiService {
     final response = await http
         .put(
           _uri('/api/products/${product.id}'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode(product.toJson()),
         )
         .timeout(_timeout);
@@ -515,7 +505,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/products/generate-code'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode({
             if (categoryId != null) 'category_id': categoryId,
             if (prefix != null && prefix.isNotEmpty) 'prefix': prefix,
@@ -543,7 +533,7 @@ class ApiService {
   }
 
   static Future<List<Order>> fetchOrders() async {
-    final response = await http.get(_uri('/api/orders')).timeout(_timeout);
+    final response = await http.get(_uri('/api/orders'), headers: _authHeaders).timeout(_timeout);
     final body = _decode(response);
     return _dataList(
       body,
@@ -665,7 +655,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/orders'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode(
             order.toJson(customerId: customerId, employeeId: employeeId),
           ),
@@ -700,7 +690,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/orders'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode(orderData),
         )
         .timeout(_timeout);
@@ -781,7 +771,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/inventory/items'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode(item.toJson()),
         )
         .timeout(_timeout);
@@ -792,7 +782,7 @@ class ApiService {
     final response = await http
         .put(
           _uri('/api/inventory/items/${item.id}'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode(item.toJson()),
         )
         .timeout(_timeout);
@@ -809,7 +799,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/inventory/import'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode({
             'inventory_item_id': inventoryItemId,
             'employee_id': employeeId,
@@ -842,7 +832,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/inventory/adjust'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode({
             'inventory_item_id': inventoryItemId,
             'employee_id': employeeId,
@@ -864,7 +854,7 @@ class ApiService {
     final response = await http
         .post(
           _uri('/api/inventory/export'),
-          headers: _headers,
+          headers: _authHeaders,
           body: jsonEncode({
             'inventory_item_id': inventoryItemId,
             'product_id': productId == null ? null : int.tryParse(productId),
@@ -1006,7 +996,7 @@ class ApiService {
   ) async {
     final encodedCode = Uri.encodeComponent(orderCode.trim());
     final response = await http
-        .get(_uri('/api/orders/status/$encodedCode'), headers: _headers)
+        .get(_uri('/api/orders/status/$encodedCode'), headers: _authHeaders)
         .timeout(_timeout);
     return _dataMap(_decode(response));
   }
@@ -1060,7 +1050,7 @@ class ApiService {
     final uri = Uri.parse(
       '$baseUrl/api/points/customer',
     ).replace(queryParameters: query);
-    final response = await http.get(uri, headers: _headers).timeout(_timeout);
+    final response = await http.get(uri, headers: _authHeaders).timeout(_timeout);
     final decoded = _decode(response);
     return decoded is Map<String, dynamic>
         ? decoded

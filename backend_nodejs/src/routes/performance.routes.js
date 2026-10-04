@@ -1,46 +1,13 @@
 const express = require("express");
 const pool = require("../config/db");
+const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
 const paidOrderCondition =
   "(o.payment_status IN ('paid', 'success') OR o.status IN ('completed', 'Hoàn thành', 'hoàn thành') OR o.order_status = 'completed')";
 
-async function requireAdmin(req, res, next) {
-  try {
-    const userId = Number(req.get("x-user-id"));
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Thieu thong tin admin",
-      });
-    }
-
-    const [users] = await pool.execute(
-      `SELECT u.user_id
-       FROM users u
-       JOIN roles r ON r.role_id = u.role_id
-       WHERE u.user_id = ? AND r.role_name = 'admin' AND u.status = 'active'`,
-      [userId],
-    );
-
-    if (users.length === 0) {
-      return res.status(403).json({
-        success: false,
-        message: "Chi admin duoc xem hieu suat san pham",
-      });
-    }
-    next();
-  } catch (error) {
-    return res.status(403).json({
-      success: false,
-      message: "Khong kiem tra duoc quyen admin",
-      error: error.message,
-    });
-  }
-}
-
-router.use(requireAdmin);
+router.use(requireAuth, requireRoles('admin'));
 
 function rangeConfig(rawRange, rawMonth) {
   const range = (rawRange || "30d").toString();

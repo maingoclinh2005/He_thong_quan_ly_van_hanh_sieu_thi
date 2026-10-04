@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const voucherController = require("../controllers/voucher.controller");
-const { requireAuth } = require("../middlewares/auth.middleware");
+const { requireAuth, requireRoles, requireSelfOrRoles } = require("../middlewares/auth.middleware");
 
 // PUBLIC ROUTES (khách hàng)
 // Validate voucher khi thanh toán
@@ -14,7 +14,7 @@ router.get("/available", voucherController.getAvailableVouchers);
 router.get("/code/:code", voucherController.getVoucherByCode);
 
 // Lấy danh sách vouchers của user
-router.get("/user/:userId", requireAuth, voucherController.getUserVouchers);
+router.get("/user/:userId", requireAuth, requireSelfOrRoles('admin'), voucherController.getUserVouchers);
 
 router.post("/:id/claim", requireAuth, voucherController.claimVoucher);
 
@@ -24,15 +24,7 @@ router.post("/:id/claim", requireAuth, voucherController.claimVoucher);
 router.post(
   "/",
   requireAuth,
-  (req, res, next) => {
-    if (req.user.role_name !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Chỉ admin mới có quyền tạo voucher",
-      });
-    }
-    next();
-  },
+  requireRoles('admin'),
   voucherController.createVoucher,
 );
 
@@ -40,15 +32,7 @@ router.post(
 router.get(
   "/",
   requireAuth,
-  (req, res, next) => {
-    if (req.user.role_name !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Chỉ admin mới có quyền xem",
-      });
-    }
-    next();
-  },
+  requireRoles('admin'),
   voucherController.getAllVouchers,
 );
 
@@ -56,15 +40,7 @@ router.get(
 router.put(
   "/:id",
   requireAuth,
-  (req, res, next) => {
-    if (req.user.role_name !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Chỉ admin mới có quyền cập nhật",
-      });
-    }
-    next();
-  },
+  requireRoles('admin'),
   voucherController.updateVoucher,
 );
 
@@ -72,15 +48,7 @@ router.put(
 router.delete(
   "/:id",
   requireAuth,
-  (req, res, next) => {
-    if (req.user.role_name !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Chỉ admin mới có quyền xóa",
-      });
-    }
-    next();
-  },
+  requireRoles('admin'),
   voucherController.deleteVoucher,
 );
 
@@ -88,15 +56,7 @@ router.delete(
 router.get(
   "/:id/usage",
   requireAuth,
-  (req, res, next) => {
-    if (req.user.role_name !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Chỉ admin mới có quyền xem",
-      });
-    }
-    next();
-  },
+  requireRoles('admin'),
   voucherController.getVoucherUsage,
 );
 

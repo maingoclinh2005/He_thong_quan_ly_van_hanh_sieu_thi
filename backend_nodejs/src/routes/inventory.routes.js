@@ -1,7 +1,11 @@
 const express = require("express");
 const pool = require("../config/db");
+const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
+
+// Inventory quantities and import prices are operational data, never public.
+router.use(requireAuth, requireRoles('employee', 'admin'));
 
 function toInventoryItem(row) {
   return {

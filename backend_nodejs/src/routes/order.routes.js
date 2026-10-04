@@ -144,7 +144,14 @@ async function fetchOrder(orderId) {
 }
 
 function currentUserId(req) {
-  return Number(req.user?.id || req.user?.user_id || req.get("x-user-id"));
+  return Number(req.user?.id || req.user?.user_id);
+}
+
+function canAccessOrder(req, order) {
+  const userId = currentUserId(req);
+  if (!userId || !order) return false;
+  if (['admin', 'employee'].includes(req.user?.role_name)) return true;
+  return Number(order.customer_id) === userId;
 }
 
 function calculateVoucherDiscount(voucher, total) {
@@ -208,7 +215,7 @@ async function applyCheckoutVoucher(connection, userId, total, voucherId, vouche
   return { voucher, discountAmount };
 }
 
-router.get("/", async (req, res) => {
+router.get("/", requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   try {
     const [rows] = await pool.execute(
       `SELECT o.*, cu.full_name AS customer_name, eu.full_name AS employee_name,
@@ -231,7 +238,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/online", async (req, res) => {
+router.get("/online", requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   try {
     const connection = await pool.getConnection();
     const columns = await ordersColumns(connection);
@@ -575,7 +582,7 @@ router.put("/:id/received", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/checkout", requireAuth, async (req, res) => {
+router.post("/checkout", requireAuth, requireRoles('customer'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const customerId = currentUserId(req);
@@ -752,7 +759,13 @@ router.post("/checkout", requireAuth, async (req, res) => {
 
 async function fetchHistory(req, res) {
   try {
-    const customerId = Number(req.params.customerId || req.get("x-user-id"));
+    const requestedCustomerId = Number(req.params.customerId || 0);
+    const customerId = ['admin', 'employee'].includes(req.user.role_name)
+      ? requestedCustomerId
+      : currentUserId(req);
+    if (requestedCustomerId && !['admin', 'employee'].includes(req.user.role_name) && requestedCustomerId !== customerId) {
+      return res.status(403).json({ success: false, message: 'Bạn chỉ có thể xem lịch sử mua hàng của mình' });
+    }
     const params = [];
     let customerWhere = "";
     if (customerId) {
@@ -785,10 +798,10 @@ async function fetchHistory(req, res) {
   }
 }
 
-router.get("/history", fetchHistory);
-router.get("/history/:customerId", fetchHistory);
+router.get("/history", requireAuth, fetchHistory);
+router.get("/history/:customerId", requireAuth, fetchHistory);
 
-router.get("/status/:orderCode", async (req, res) => {
+router.get("/status/:orderCode", requireAuth, async (req, res) => {
   try {
     const rawCode = String(req.params.orderCode || "").trim().toUpperCase();
     const normalizedCode = rawCode.replace(/[^A-Z0-9]/g, "");
@@ -819,6 +832,9 @@ router.get("/status/:orderCode", async (req, res) => {
     }
 
     const order = await fetchOrder(rows[0].order_id);
+    if (!canAccessOrder(req, order)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem đơn hàng này' });
+    }
     const paymentStatus = String(order.paymentStatus || "pending").toLowerCase();
     return res.json({
       success: true,
@@ -914,13 +930,16 @@ router.get("/:id/payment-status", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", requireAuth, async (req, res) => {
   try {
     const order = await fetchOrder(req.params.id);
     if (!order) {
       return res
         .status(404)
         .json({ success: false, message: "Không tìm thấy đơn hàng" });
+    }
+    if (!canAccessOrder(req, order)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem đơn hàng này' });
     }
     res.json({ success: true, data: order });
   } catch (error) {
@@ -934,7 +953,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.patch("/:id/status", async (req, res) => {
+router.patch("/:id/status", requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   try {
     const status = String(req.body.status || "").trim();
     const allowed = [
@@ -954,7 +973,7 @@ router.patch("/:id/status", async (req, res) => {
     }
 
     const orderStatus = normalizeOrderStatusValue(status, "online");
-    const employeeId = Number(req.get("x-user-id")) || null;
+    const employeeId = currentUserId(req) || null;
     const connection = await pool.getConnection();
     const columns = await ordersColumns(connection);
     connection.release();
@@ -1001,7 +1020,7 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, requireRoles('employee', 'admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const {
@@ -1097,14 +1116,14 @@ router.post("/", async (req, res) => {
       }
     }
 
-    const employeeId = employee_id ? Number(employee_id) : null;
+    const employeeId = currentUserId(req);
     const hasOrdersShiftId = await ordersHasShiftId(connection);
     const activeShiftId = hasOrdersShiftId
       ? await getActiveShiftId(connection, employeeId)
       : null;
     const columns = await ordersColumns(connection);
     const requestUserId =
-      Number(user_id || customer_id || req.get("x-user-id")) || null;
+      Number(user_id || customer_id) || null;
     let customerId = customer_id || (order_type === "online" ? requestUserId : null);
     const normalizedOrderStatus = normalizeOrderStatusValue(
       order_status || status,

@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { hashPassword } = require('../services/auth.service');
-const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
+const { requireAuth, requireRoles, requireSelfOrRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
@@ -107,7 +107,7 @@ function emptyEmployeeSummary(user) {
   };
 }
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
     const [rows] = await pool.execute(
       `SELECT u.*, r.role_name
@@ -175,7 +175,7 @@ router.post('/', requireAuth, requireRoles('admin'), async (req, res) => {
   }
 });
 
-router.get('/:id/employee-summary', async (req, res) => {
+router.get('/:id/employee-summary', requireAuth, requireSelfOrRoles('admin'), async (req, res) => {
   try {
     const [users] = await pool.execute(
       `SELECT u.*, r.role_name
@@ -321,7 +321,7 @@ router.get('/:id/employee-summary', async (req, res) => {
   }
 });
 
-router.put('/:id/profile', requireAuth, async (req, res) => {
+router.put('/:id/profile', requireAuth, requireSelfOrRoles('admin'), async (req, res) => {
   try {
     const { full_name, fullName, phone, password, address } = req.body;
     const name = full_name || fullName || null;
