@@ -583,21 +583,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
     try {
       final userId = pendingOrder.customerId ?? DBService.currentUserId() ?? 0;
       final orderId = int.tryParse(pendingOrder.id) ?? 0;
-      final data = result!.paidAutomatically
-          ? await ApiService.fetchOrderPaymentStatus(
-              userId: userId,
-              orderId: orderId,
-            ).timeout(_checkoutTimeout)
-          : await ApiService.confirmBankTransferManual(
-              userId: userId,
-              orderId: orderId,
-            ).timeout(_checkoutTimeout);
-      final savedOrder = result.paidAutomatically
-          ? await _markPendingBankOrderPaid(pendingOrder, data)
-          : Order.fromJson(data);
       if (!result.paidAutomatically) {
-        await DBService.orders().put(savedOrder.id, savedOrder);
+        if (!mounted) return;
+        _showSnack(
+          'Đã ghi nhận giao dịch. Đơn hàng sẽ được cập nhật sau khi hệ thống hoặc quản trị viên xác nhận.',
+          success: true,
+        );
+        widget.onCheckoutComplete();
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
       }
+      final data = await ApiService.fetchOrderPaymentStatus(
+        userId: userId,
+        orderId: orderId,
+      ).timeout(_checkoutTimeout);
+      final savedOrder = await _markPendingBankOrderPaid(pendingOrder, data);
       if (!mounted) return;
       _openSuccess(savedOrder);
     } on TimeoutException {

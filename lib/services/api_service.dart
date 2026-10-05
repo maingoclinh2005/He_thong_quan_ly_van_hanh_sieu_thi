@@ -1001,20 +1001,6 @@ class ApiService {
     return _dataMap(_decode(response));
   }
 
-  static Future<Map<String, dynamic>> confirmBankTransferManual({
-    required int userId,
-    required int orderId,
-  }) async {
-    final response = await http
-        .post(
-          _uri('/api/payments/bank-transfer/manual-confirm'),
-          headers: _userHeadersFor(userId),
-          body: jsonEncode({'order_id': orderId}),
-        )
-        .timeout(_timeout);
-    return _dataMap(_decode(response));
-  }
-
   static Future<Map<String, dynamic>> addCustomerPoints({
     required String customerName,
     required String phone,
