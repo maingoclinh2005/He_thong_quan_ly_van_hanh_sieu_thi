@@ -244,23 +244,6 @@ async function handleNormalizedBankTransaction(connection, normalized, rawPayloa
   };
 }
 
-async function canAccessOrder(userId, order) {
-  if (!userId || !order) return false;
-  if (Number(order.customer_id || 0) === userId) return true;
-  if (Number(order.employee_id || 0) === userId) return true;
-
-  const [users] = await pool.execute(
-    `SELECT r.role_name
-     FROM users u
-     LEFT JOIN roles r ON r.role_id = u.role_id
-     WHERE u.user_id = ?
-     LIMIT 1`,
-    [userId],
-  );
-  const role = String(users[0]?.role_name || "").toLowerCase();
-  return role.includes("admin") || role.includes("quản");
-}
-
 async function processVnpayCallback(query) {
   const verified = vnpay.verifyIpnQuery(query);
   if (!verified.isValid) {
@@ -524,11 +507,7 @@ router.post("/bank-webhook", bankWebhookHandler);
 router.post("/sepay", bankWebhookHandler);
 
 router.post("/bank-transfer/manual-confirm", requireAuth, requireRoles('admin'), async (req, res) => {
-  const userId = currentUserId(req);
   const orderId = Number(req.body.order_id || req.body.orderId);
-  if (!userId) {
-    return res.status(401).json({ success: false, message: "Vui lòng đăng nhập" });
-  }
   if (!orderId) {
     return res.status(400).json({ success: false, message: "Thiếu orderId" });
   }
@@ -541,10 +520,6 @@ router.post("/bank-transfer/manual-confirm", requireAuth, requireRoles('admin'),
     if (!order) {
       await connection.rollback();
       return res.status(404).json({ success: false, message: "Không tìm thấy đơn hàng" });
-    }
-    if (!(await canAccessOrder(userId, order))) {
-      await connection.rollback();
-      return res.status(403).json({ success: false, message: "Không có quyền xác nhận đơn này" });
     }
     if (
       order.payment_method &&
