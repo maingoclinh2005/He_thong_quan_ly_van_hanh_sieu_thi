@@ -577,7 +577,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ),
       ),
     );
-    if (result?.confirmed != true || !mounted) return;
+    if (result == null || !result.confirmed || !mounted) return;
 
     setState(() => _isProcessing = true);
     try {
