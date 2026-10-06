@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../models/order.dart';
 import '../models/product.dart';
@@ -517,12 +518,21 @@ class ApiService {
   }
 
   static Future<String> uploadProductImage(String filePath) async {
+    final token = _authToken;
+    if (token == null) throw ApiException('Vui lòng đăng nhập để tải ảnh');
+    final extension = filePath.split('.').last.toLowerCase();
+    const types = {'jpg': 'jpeg', 'jpeg': 'jpeg', 'png': 'png', 'gif': 'gif', 'webp': 'webp'};
+    final subtype = types[extension];
+    if (subtype == null) throw ApiException('Vui lòng chọn ảnh JPG, PNG, GIF hoặc WebP');
     final request = http.MultipartRequest(
       'POST',
       _uri('/api/uploads/product-image'),
     );
-    request.files.add(await http.MultipartFile.fromPath('image', filePath));
-    final streamed = await request.send().timeout(_timeout);
+    request.headers['Authorization'] = 'Bearer $token';
+    final file = await http.MultipartFile.fromPath('image', filePath, contentType: MediaType('image', subtype));
+    if (file.length > 5 * 1024 * 1024) throw ApiException('Ảnh không được vượt quá 5 MB');
+    request.files.add(file);
+    final streamed = await request.send().timeout(const Duration(seconds: 30));
     final response = await http.Response.fromStream(streamed);
     final body = _dataMap(_decode(response));
     final rawUrl = (body['url'] ?? body['image_url'] ?? '').toString();
