@@ -49,7 +49,13 @@ app.use("/api/vouchers", voucherRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/webhook", paymentRoutes);
 app.use("/api/points", pointRoutes);
-app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads"), {
+  dotfiles: 'deny',
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+  },
+}));
 
 app.get("/", (req, res) => {
   res.json({

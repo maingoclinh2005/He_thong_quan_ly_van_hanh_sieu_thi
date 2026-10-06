@@ -1,67 +1,31 @@
 {
-  
-    "name": "mini_market_backend",
-  
-    "version": "1.0.0",
-  
-    "main": "index.js",
-  
-    "scripts": {
-  
-      
+  "name": "mini_market_backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
     "start": "node src/server.js",
-  
-      
     "dev": "nodemon src/server.js",
-  
-      
-    "test:vnpay": "node scripts/test-vnpay-sign.js"
-  
-    },
-  
-    "keywords": [],
-  
-    "author": "",
-  
-    "license": "ISC",
-  
-    "description": "",
-  
-    "dependencies": {
-  
-      
+    "test:vnpay": "node scripts/test-vnpay-sign.js",
+    "test:upload": "node --test test/upload.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
     "bcrypt": "^6.0.0",
-  
-      
     "cors": "^2.8.6",
-  
-      
     "dotenv": "^17.4.2",
-  
-      
     "express": "^5.2.1",
-  
-      
+    "express-rate-limit": "^8.7.1",
     "jsonwebtoken": "^9.0.3",
-  
-      
-    "multer": "^2.0.2",
-  
-      
+    "multer": "^2.4.0",
     "mysql2": "^3.22.3",
-  
-      
     "nodemailer": "^8.0.10",
-  
-      
+    "sharp": "^0.35.5",
     "twilio": "^6.0.2"
-  
-    },
-  
-    "devDependencies": {
-  
-      
+  },
+  "devDependencies": {
     "nodemon": "^3.1.14"
-  
-    }
+  }
 }
