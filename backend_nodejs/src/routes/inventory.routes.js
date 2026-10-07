@@ -46,10 +46,6 @@ router.get("/items", async (req, res) => {
 });
 
 router.post("/items", async (req, res) => {
-  console.log("HIT POST /api/inventory/items", {
-    path: req.path,
-    body: req.body,
-  });
   try {
     const {
       barcode,
@@ -66,13 +62,6 @@ router.post("/items", async (req, res) => {
       categoryId,
     } = req.body;
 
-    console.log("POST /api/inventory/items body:", {
-      barcode,
-      item_name,
-      price,
-      category_id,
-      categoryId,
-    });
 
     const itemName = item_name || name;
     if (!barcode || !itemName || price == null) {

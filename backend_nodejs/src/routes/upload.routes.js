@@ -6,6 +6,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const { rateLimit } = require('express-rate-limit');
 const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
+const { limiter } = require('../middlewares/security');
 
 const formats = {
   '.jpg': ['image/jpeg', 'jpeg'], '.jpeg': ['image/jpeg', 'jpeg'],
@@ -31,7 +32,7 @@ function createUploadRouter({
     },
   }).single('image');
 
-  router.post('/product-image', requireAuth, requireRoles('employee', 'admin'), rateLimit({
+  router.post('/product-image', limiter(60, 5 * 60 * 1000), requireAuth, requireRoles('employee', 'admin'), rateLimit({
     windowMs: 5 * 60 * 1000,
     limit: requestLimit,
     keyGenerator: (req) => String(req.user.user_id),

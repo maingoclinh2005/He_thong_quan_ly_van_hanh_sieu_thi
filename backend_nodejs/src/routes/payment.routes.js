@@ -17,10 +17,6 @@ function currentUserId(req) {
 }
 
 function clientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) {
-    return String(forwarded).split(",")[0].trim();
-  }
   return req.ip || req.socket?.remoteAddress || "127.0.0.1";
 }
 
@@ -327,7 +323,7 @@ async function processVnpayCallback(query) {
     return {
       httpStatus: 500,
       rspCode: "99",
-      message: error.message,
+      message: 'Payment processing failed',
       paymentStatus: "failed",
       orderId,
     };
@@ -457,9 +453,6 @@ async function bankWebhookHandler(req, res) {
     return res.status(401).json({ success: false, message: "Webhook token không hợp lệ" });
   }
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[BANK WEBHOOK]", JSON.stringify(req.body));
-  }
 
   const normalizedItems = normalizeBankWebhookPayloads(req.body);
   const connection = await pool.getConnection();

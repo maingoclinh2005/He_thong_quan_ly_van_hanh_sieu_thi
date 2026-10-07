@@ -218,7 +218,7 @@ router.get('/:id/employee-summary', requireAuth, requireSelfOrRoles('admin'), as
       currentShift = currentShiftRows[0] || null;
       latestShift = latestShiftRows[0] || null;
     } catch (shiftError) {
-      console.error('employee-summary shift query failed:', shiftError);
+      console.error('employee-summary shift query failed:', { request_id: req.requestId });
     }
 
     const statsShift = currentShift || latestShift;
@@ -316,7 +316,7 @@ router.get('/:id/employee-summary', requireAuth, requireSelfOrRoles('admin'), as
       },
     });
   } catch (error) {
-    console.error('employee-summary failed:', error);
+    console.error('employee-summary failed:', { request_id: req.requestId });
     res.status(500).json({ success: false, message: 'Lỗi lấy chi tiết nhân viên', error: error.message });
   }
 });

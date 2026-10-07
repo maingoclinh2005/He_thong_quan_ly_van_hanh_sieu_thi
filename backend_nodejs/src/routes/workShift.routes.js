@@ -133,7 +133,7 @@ router.get('/', requireAuth, requireRoles('admin'), async (req, res) => {
       meta: { total: rows.length },
     });
   } catch (error) {
-    console.error('work-shifts all failed:', error);
+    console.error('work-shifts all failed:', { request_id: req.requestId });
     res.status(500).json({
       success: false,
       message: 'Lỗi lấy danh sách ca làm',
@@ -173,7 +173,7 @@ router.get('/employee/:employeeId', requireAuth, requireSelfOrRoles('admin'), as
       meta: { year, month, total: rows.length },
     });
   } catch (error) {
-    console.error('work-shifts list failed:', error);
+    console.error('work-shifts list failed:', { request_id: req.requestId });
     res.status(500).json({
       success: false,
       message: 'Lỗi lấy lịch ca làm',
@@ -242,7 +242,7 @@ router.post('/start', requireAuth, requireRoles('employee', 'admin'), async (req
       data: toShift(rows[0]),
     });
   } catch (error) {
-    console.error('work-shifts start failed:', error);
+    console.error('work-shifts start failed:', { request_id: req.requestId });
     await connection.rollback();
     res.status(500).json({ success: false, message: 'Lỗi bắt đầu ca làm', error: error.message });
   } finally {
@@ -295,7 +295,7 @@ router.post('/end', requireAuth, requireRoles('employee', 'admin'), async (req, 
       data: toShift(rows[0]),
     });
   } catch (error) {
-    console.error('work-shifts end failed:', error);
+    console.error('work-shifts end failed:', { request_id: req.requestId });
     await connection.rollback();
     res.status(500).json({ success: false, message: 'Lỗi kết thúc ca làm', error: error.message });
   } finally {

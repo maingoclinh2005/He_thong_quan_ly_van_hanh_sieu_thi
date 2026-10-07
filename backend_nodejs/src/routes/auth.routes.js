@@ -21,6 +21,8 @@ const {
 } = require('../services/otp.service');
 
 const router = express.Router();
+const { createAuthLimits } = require('../middlewares/security');
+const limits = createAuthLimits();
 
 function toUser(row) {
   return {
@@ -131,7 +133,7 @@ async function createResetOtp(user, type) {
 }
 
 // Customer self registration only. Employees are created by admin; admin accounts are seeded.
-router.post('/register', async (req, res) => {
+router.post('/register', limits.register, async (req, res) => {
   try {
     const fullName = String(req.body.full_name || req.body.fullName || '').trim();
     const email = normalizeEmail(req.body.email);
@@ -195,7 +197,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', ...limits.login, async (req, res) => {
   try {
     const identifier = req.body.identifier || req.body.email || req.body.phone;
     const password = String(req.body.password || '');
@@ -223,6 +225,7 @@ router.post('/login', async (req, res) => {
     }
 
     const safeUser = toUser(user);
+    req.user = safeUser;
     res.json({
       success: true,
       message: 'Đăng nhập thành công',
@@ -238,7 +241,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-router.post('/forgot-password/email', async (req, res) => {
+router.post('/forgot-password/email', ...limits.otpSend, async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email || req.body.identifier);
     if (!email) {
@@ -265,7 +268,7 @@ router.post('/forgot-password/email', async (req, res) => {
   }
 });
 
-router.post('/forgot-password/phone', async (req, res) => {
+router.post('/forgot-password/phone', ...limits.otpSend, async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone || req.body.identifier);
     if (!phone) {
@@ -292,7 +295,7 @@ router.post('/forgot-password/phone', async (req, res) => {
   }
 });
 
-router.post('/verify-otp', async (req, res) => {
+router.post('/verify-otp', ...limits.otpVerify, async (req, res) => {
   try {
     const identifier = req.body.identifier || req.body.email || req.body.phone;
     const otp = String(req.body.otp || req.body.otp_code || '').trim();
@@ -342,7 +345,7 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', limits.reset, async (req, res) => {
   try {
     const resetToken = String(req.body.reset_token || '').trim();
     const newPassword = String(req.body.new_password || req.body.password || '');

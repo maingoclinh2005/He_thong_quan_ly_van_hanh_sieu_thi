@@ -33,7 +33,7 @@ function canSendSms() {
 
 async function sendPasswordResetEmail(email, otp) {
   if (!canSendEmail()) {
-    if (process.env.ALLOW_OTP_CONSOLE_FALLBACK === 'true') {
+    if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_OTP_CONSOLE_FALLBACK === 'true') {
       console.log(`[OTP][EMAIL demo] ${email}: ${otp}`);
       return { sent: false, channel: 'console' };
     }
@@ -62,7 +62,7 @@ async function sendPasswordResetEmail(email, otp) {
 
 async function sendPasswordResetSms(phone, otp) {
   if (!canSendSms()) {
-    if (process.env.ALLOW_OTP_CONSOLE_FALLBACK === 'true') {
+    if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_OTP_CONSOLE_FALLBACK === 'true') {
       console.log(`[OTP][PHONE demo] ${phone}: ${otp}`);
       return { sent: false, channel: 'console' };
     }

@@ -1047,18 +1047,6 @@ router.post("/", requireAuth, requireRoles('employee', 'admin'), async (req, res
       points_to_use = 0,
     } = req.body;
 
-    // DEBUG: Log dữ liệu nhận được
-    console.log("[ORDER DEBUG] Received:", {
-      voucher_id,
-      discount_amount,
-      user_id,
-      customer_id,
-      customer_phone,
-      use_points,
-      points_to_use,
-      employee_id,
-      items_count: items?.length,
-    });
 
     if (!Array.isArray(items) || items.length === 0) {
       return res
