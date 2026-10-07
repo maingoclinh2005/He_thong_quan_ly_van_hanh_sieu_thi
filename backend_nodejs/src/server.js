@@ -1,14 +1,14 @@
 const express = require("express");
-const cors = require("cors");
-const path = require("path");
 require("dotenv").config();
+const { configureSecurity, securityErrorHandler } = require('./middlewares/security');
+const { requireAuth, requireRoles } = require('./middlewares/auth.middleware');
+const path = require("path");
 
 const pool = require("./config/db");
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+configureSecurity(app);
 
 const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/user.routes");
@@ -64,7 +64,7 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/api/test-db", async (req, res) => {
+app.get("/api/test-db", requireAuth, requireRoles('admin'), async (req, res) => {
   try {
     const [rows] = await pool.execute("SELECT * FROM roles");
 
@@ -82,12 +82,21 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
+app.use((req, res) => res.status(404).json({ success: false, message: 'Không tìm thấy API.' }));
+app.use(securityErrorHandler);
+
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, "0.0.0.0", () => {
+if (require.main === module) app.listen(PORT, "0.0.0.0", () => {
+  if (process.env.NODE_ENV === 'production' || process.env.REQUIRE_HTTPS === 'true') {
+    console.log(`API upstream port ${PORT}; chỉ nhận HTTPS qua reverse proxy tin cậy.`);
+    return;
+  }
   console.log(`Server đang chạy tại http://localhost:${PORT}`);
   console.log(
     "Điện thoại thật (cùng Wi-Fi): dùng IP máy tính, ví dụ http://192.168.x.x:" +
       PORT,
   );
 });
+
+module.exports = app;

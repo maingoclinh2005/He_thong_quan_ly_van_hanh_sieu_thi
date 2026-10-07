@@ -6,7 +6,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test:vnpay": "node scripts/test-vnpay-sign.js",
-    "test:upload": "node --test test/upload.test.js"
+    "test:upload": "node --test test/upload.test.js",
+    "test:security": "node --test test/security.test.js"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +19,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
     "mysql2": "^3.22.3",

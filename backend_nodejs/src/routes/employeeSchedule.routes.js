@@ -221,7 +221,7 @@ router.get('/employee/:employeeId/month', requireAuth, requireSelfOrRoles('admin
       },
     });
   } catch (error) {
-    console.error('employee-schedule month failed:', error);
+    console.error('employee-schedule month failed:', { request_id: req.requestId });
     res.status(500).json({ success: false, message: 'Lỗi lấy lịch tháng', error: error.message });
   }
 });

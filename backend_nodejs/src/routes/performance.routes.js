@@ -241,7 +241,7 @@ router.get("/dashboard", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[performance] dashboard error", error);
+    console.error("[performance] dashboard error", { request_id: req.requestId });
     res.status(500).json({
       success: false,
       message: "Loi lay dashboard hieu suat san pham",
