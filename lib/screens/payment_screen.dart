@@ -124,7 +124,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return;
     }
 
-    final token = (DBService.settings().get('auth_token') ?? '').toString();
+    // The shared HTTP client supplies the current secure token, including after refresh.
+    const token = '';
     final vouchers = await VoucherService.getUserVouchers(userId, token);
     if (!mounted) return;
     setState(() {

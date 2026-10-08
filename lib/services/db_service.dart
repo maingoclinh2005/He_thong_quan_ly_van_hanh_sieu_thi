@@ -7,6 +7,7 @@ import '../models/order.dart';
 import '../models/order_line.dart';
 import '../models/inventory_history_entry.dart';
 import 'api_service.dart';
+import 'token_store.dart';
 import '../utils/type_converters.dart';
 import '../utils/constants.dart';
 
@@ -53,6 +54,7 @@ class DBService {
     _registerAdapterOnce(InventoryHistoryEntryAdapter());
 
     await Hive.openBox(settingsBox);
+    await initializeAuthStorage();
     await _deleteOldCacheFromDiskIfNeeded();
 
     // 2. Open Boxes
@@ -98,6 +100,17 @@ class DBService {
   }
 
   // CÁC HÀM GETTER
+  static Future<void> initializeAuthStorage() async {
+    // Old stateless JWTs cannot be upgraded to revocable sessions. Require login once.
+    final hadLegacySecret =
+        settings().containsKey('auth_token') ||
+        settings().containsKey('remember_pass');
+    if (settings().containsKey('auth_token')) await clearAuthSession();
+    await settings().delete('remember_pass');
+    if (hadLegacySecret) await settings().compact();
+    await TokenStore.instance.initialize();
+  }
+
   static Box<Product> products() => Hive.box<Product>(productsBox);
   static Box<InventoryItem> inventoryProducts() =>
       Hive.box<InventoryItem>(inventoryProductsBox);
@@ -614,17 +627,20 @@ class DBService {
   }
 
   static String? currentUserEmail() {
+    if (!TokenStore.instance.hasSession) return null;
     final value = settings().get('current_user_email');
     return value is String && value.isNotEmpty ? value : null;
   }
 
   static int? currentUserId() {
+    if (!TokenStore.instance.hasSession) return null;
     final value = settings().get('current_user_id');
     if (value is int) return value;
     return int.tryParse(value?.toString() ?? '');
   }
 
   static Future<void> clearAuthSession() async {
+    await TokenStore.instance.clear();
     final box = settings();
     await Future.wait([
       box.delete('auth_token'),

@@ -6,7 +6,6 @@ const {
   hashPassword,
   verifyPassword,
   isBcryptHash,
-  signAuthToken,
   signResetToken,
   verifyResetToken,
   normalizeEmail,
@@ -21,8 +20,31 @@ const {
 } = require('../services/otp.service');
 
 const router = express.Router();
+router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 const { createAuthLimits } = require('../middlewares/security');
 const limits = createAuthLimits();
+const { limiter } = require('../middlewares/security');
+const { createSession, refreshSession, revokeSessions } = require('../services/session.service');
+
+router.post('/refresh', limiter(60), async (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    res.json({ success: true, ...await refreshSession(req.body?.refresh_token) });
+  } catch (error) {
+    if (error.status === 401) return res.status(401).json({ success: false, message: error.message });
+    next(error);
+  }
+});
+
+router.post('/logout', requireAuth, async (req, res) => {
+  await revokeSessions(req.user.user_id, req.sessionId);
+  res.json({ success: true, message: 'Đã đăng xuất thiết bị này' });
+});
+
+router.post('/logout-all', requireAuth, limiter(10), async (req, res) => {
+  await revokeSessions(req.user.user_id);
+  res.json({ success: true, message: 'Đã đăng xuất tất cả thiết bị' });
+});
 
 function toUser(row) {
   return {
@@ -221,15 +243,20 @@ router.post('/login', ...limits.login, async (req, res) => {
     }
 
     if (!isBcryptHash(storedPassword)) {
-      await updatePasswordHash(user.user_id, await hashPassword(password));
+      const upgraded = await hashPassword(password);
+      await updatePasswordHash(user.user_id, upgraded);
+      user.password = upgraded;
+      user.password_hash = upgraded;
     }
 
     const safeUser = toUser(user);
+    const pair = await createSession(user);
     req.user = safeUser;
+    res.set('Cache-Control', 'no-store');
     res.json({
       success: true,
       message: 'Đăng nhập thành công',
-      token: signAuthToken(safeUser),
+      ...pair,
       user: safeUser,
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { credentialHash } = require('../services/session.service');
 
 function getJwtSecret() {
   const secret = String(process.env.JWT_SECRET || '').trim();
@@ -9,18 +10,25 @@ function getJwtSecret() {
   return secret;
 }
 
-async function loadUser(userId) {
+async function loadUser(userId, sessionId) {
   const [users] = await pool.execute(
     `SELECT u.user_id, u.full_name, u.email, u.phone, u.address, u.points,
-            u.membership_code, u.status, u.created_at, r.role_name
+            u.membership_code, u.status, u.created_at, r.role_name,
+            u.password, u.password_hash, s.credential_hash
      FROM users u
      JOIN roles r ON r.role_id = u.role_id
+     JOIN auth_sessions s ON s.user_id = u.user_id
      WHERE u.user_id = ? AND u.status = 'active'
+       AND s.session_id = ? AND s.revoked_at IS NULL AND s.expires_at > NOW()
      LIMIT 1`,
-    [userId]
+    [userId, sessionId]
   );
   const user = users[0] || null;
   if (user) {
+    if (credentialHash(user) !== user.credential_hash) return null;
+    delete user.password;
+    delete user.password_hash;
+    delete user.credential_hash;
     user.id = user.user_id;
   }
   return user;
@@ -32,14 +40,19 @@ async function requireAuth(req, res, next) {
 
   if (scheme === 'Bearer' && token) {
     try {
-      const payload = jwt.verify(token, getJwtSecret());
-      const user = await loadUser(payload.id || payload.user_id);
+      const payload = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
+      if (payload.purpose !== 'access' || typeof payload.sid !== 'string' || !Number.isInteger(payload.user_id)) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập lại' });
+      }
+      const user = await loadUser(payload.user_id, payload.sid);
       if (!user) {
         return res.status(401).json({ success: false, message: 'Tài khoản không hợp lệ' });
       }
       req.user = user;
+      req.sessionId = payload.sid;
       return next();
     } catch (error) {
+      if (!(error instanceof jwt.JsonWebTokenError)) return next(error);
       return res.status(401).json({ success: false, message: 'Token không hợp lệ hoặc đã hết hạn' });
     }
   }

@@ -2,7 +2,6 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = String(process.env.JWT_SECRET || '').trim();
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const RESET_TOKEN_EXPIRES_IN = process.env.RESET_TOKEN_EXPIRES_IN || '15m';
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 10);
 
@@ -27,19 +26,6 @@ async function verifyPassword(password, storedValue) {
     return bcrypt.compare(password, storedValue);
   }
   return password === storedValue;
-}
-
-function signAuthToken(user) {
-  return jwt.sign(
-    {
-      id: user.user_id,
-      user_id: user.user_id,
-      email: user.email,
-      role_name: user.role_name,
-    },
-    requireJwtSecret(),
-    { expiresIn: JWT_EXPIRES_IN }
-  );
 }
 
 function signResetToken(resetToken) {
@@ -95,7 +81,6 @@ module.exports = {
   hashPassword,
   verifyPassword,
   isBcryptHash,
-  signAuthToken,
   signResetToken,
   verifyResetToken,
   normalizeEmail,

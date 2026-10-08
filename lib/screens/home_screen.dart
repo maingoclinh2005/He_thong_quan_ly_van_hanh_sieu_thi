@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/token_store.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -64,7 +65,8 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color _surface = Color(0xFFF6F7F9);
   static const String _allCategoryLabel = 'Tất cả';
 
-  bool get _isGuest => DBService.currentUserId() == null;
+  bool get _isGuest =>
+      !TokenStore.instance.hasSession || DBService.currentUserId() == null;
 
   Future<bool> _requireLogin({
     String message = 'Vui lòng đăng nhập để tiếp tục',
@@ -675,8 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
           title: 'Quản lý mã khuyến mãi',
           onTap: () {
             Navigator.of(context).pop();
-            final settings = DBService.settings();
-            final token = settings.get('auth_token') ?? '';
+            const token = '';
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => AdminVouchersScreen(token: token.toString()),

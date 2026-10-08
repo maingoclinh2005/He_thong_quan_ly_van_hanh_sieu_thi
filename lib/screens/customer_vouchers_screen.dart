@@ -1,3 +1,4 @@
+import '../services/token_store.dart';
 import 'package:flutter/material.dart';
 
 import '../models/voucher.dart';
@@ -40,7 +41,7 @@ class _CustomerVouchersScreenState extends State<CustomerVouchersScreen> {
 
     try {
       final userId = DBService.currentUserId();
-      final token = (DBService.settings().get('auth_token') ?? '').toString();
+      final token = (TokenStore.instance.accessToken ?? '').toString();
       final available = await VoucherService.getAvailableVouchers();
       final saved = userId == null
           ? <Voucher>[]
@@ -68,7 +69,7 @@ class _CustomerVouchersScreenState extends State<CustomerVouchersScreen> {
     }
 
     setState(() => _claimingVoucherId = voucher.id);
-    final token = (DBService.settings().get('auth_token') ?? '').toString();
+    final token = (TokenStore.instance.accessToken ?? '').toString();
     final result = await VoucherService.claimVoucher(
       voucherId: voucher.id,
       token: token,

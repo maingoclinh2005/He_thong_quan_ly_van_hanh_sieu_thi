@@ -1,4 +1,3 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/voucher.dart';
 import 'api_service.dart';
@@ -22,7 +21,7 @@ class VoucherService {
     required int userId,
   }) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .post(
             Uri.parse('$baseUrl/validate'),
             headers: {'Content-Type': 'application/json'},
@@ -78,7 +77,7 @@ class VoucherService {
   // 2. GET AVAILABLE VOUCHERS - Danh sách vouchers khả dụng
   static Future<List<Voucher>> getAvailableVouchers() async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .get(
             Uri.parse('$baseUrl/available'),
             headers: {'Content-Type': 'application/json'},
@@ -105,7 +104,7 @@ class VoucherService {
   // 3. GET VOUCHER BY CODE
   static Future<Voucher?> getVoucherByCode(String code) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .get(
             Uri.parse('$baseUrl/code/$code'),
             headers: {'Content-Type': 'application/json'},
@@ -131,7 +130,7 @@ class VoucherService {
   // 4. GET USER VOUCHERS - Danh sách vouchers của user
   static Future<List<Voucher>> getUserVouchers(int userId, String token) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .get(
             Uri.parse('$baseUrl/user/$userId'),
             headers: _getAuthHeaders(token),
@@ -161,7 +160,7 @@ class VoucherService {
     required String token,
   }) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .post(
             Uri.parse('$baseUrl/$voucherId/claim'),
             headers: _getAuthHeaders(token),
@@ -206,7 +205,7 @@ class VoucherService {
     required String token,
   }) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .post(
             Uri.parse(baseUrl),
             headers: _getAuthHeaders(token),
@@ -252,7 +251,7 @@ class VoucherService {
   // 6. GET ALL VOUCHERS (Admin)
   static Future<List<Voucher>> getAllVouchers(String token) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .get(Uri.parse(baseUrl), headers: _getAuthHeaders(token))
           .timeout(
             timeoutDuration,
@@ -287,7 +286,7 @@ class VoucherService {
     required String token,
   }) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .put(
             Uri.parse('$baseUrl/$id'),
             headers: _getAuthHeaders(token),
@@ -330,7 +329,7 @@ class VoucherService {
     String token,
   ) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .delete(Uri.parse('$baseUrl/$id'), headers: _getAuthHeaders(token))
           .timeout(
             timeoutDuration,
@@ -360,7 +359,7 @@ class VoucherService {
     String token,
   ) async {
     try {
-      final response = await http
+      final response = await ApiService.client
           .get(Uri.parse('$baseUrl/$id/usage'), headers: _getAuthHeaders(token))
           .timeout(
             timeoutDuration,

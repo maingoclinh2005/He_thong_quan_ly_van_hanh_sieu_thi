@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_state.dart';
 import '../widgets/role_bottom_navigation_bar.dart';
 import '../widgets/slide_page_route.dart';
 import '../services/db_service.dart';
@@ -52,11 +54,49 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     setState(() => _loadUser());
   }
 
-  Future<void> _logout() async {
-    await DBService.clearAuthSession();
-
-    if (!mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+  bool _loggingOut = false;
+  Future<void> _logout({bool allDevices = false}) async {
+    if (_loggingOut) return;
+    if (allDevices) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Đăng xuất tất cả thiết bị?'),
+          content: const Text(
+            'Mọi phiên đăng nhập, kể cả thiết bị này, sẽ bị thu hồi.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Đăng xuất tất cả'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    setState(() => _loggingOut = true);
+    try {
+      await context.read<AuthState>().logout(allDevices: allDevices);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Chưa thu hồi được phiên trên máy chủ. Kiểm tra kết nối và thử lại.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loggingOut = false);
+    }
   }
 
   Future<void> _openCheckoutFromTab() async {
@@ -201,6 +241,11 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               const SizedBox(height: 12),
 
               _buildLogoutButton(),
+              TextButton.icon(
+                onPressed: _loggingOut ? null : () => _logout(allDevices: true),
+                icon: const Icon(Icons.phonelink_erase),
+                label: const Text('Đăng xuất tất cả thiết bị'),
+              ),
 
               const SizedBox(height: 24),
             ],
@@ -363,7 +408,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: InkWell(
-        onTap: _logout,
+        onTap: _loggingOut ? null : () => _logout(),
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
