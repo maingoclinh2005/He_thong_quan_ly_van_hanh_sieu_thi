@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'services/auth_state.dart';
+import 'services/token_store.dart';
 import 'services/db_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/welcome_screen.dart';
@@ -56,8 +57,7 @@ class _RootPageState extends State<RootPage> {
       final seen = box.get('welcomeSeen', defaultValue: false) as bool;
       final savedRole = box.get('current_role')?.toString();
       final hasSession =
-          DBService.currentUserId() != null &&
-          (box.get('auth_token')?.toString().isNotEmpty ?? false);
+          DBService.currentUserId() != null && TokenStore.instance.hasSession;
       if (!mounted) return;
       if (hasSession && savedRole != null && savedRole.isNotEmpty) {
         Provider.of<AuthState>(context, listen: false).restore(savedRole);
@@ -133,8 +133,19 @@ class _RootPageState extends State<RootPage> {
     final auth = Provider.of<AuthState>(context);
     return HomeScreen(
       role: auth.role ?? 'customer',
-      onLogout: () {
-        auth.logout();
+      onLogout: () async {
+        try {
+          await auth.logout();
+        } catch (_) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Chưa đăng xuất được trên máy chủ. Kiểm tra kết nối và thử lại.',
+              ),
+            ),
+          );
+        }
       },
     );
   }

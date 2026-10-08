@@ -12,6 +12,8 @@ import '../models/employee_schedule_day.dart';
 import '../models/user.dart';
 import '../models/inventory_item.dart';
 import 'db_service.dart';
+import 'token_store.dart';
+import 'session_client.dart';
 import '../utils/constants.dart';
 
 // Ca làm / tổng hợp nhân viên có thể chậm hơn API thông thường.
@@ -27,6 +29,7 @@ class ApiException implements Exception {
 }
 
 class ApiService {
+  static final http.Client client = SessionClient(baseUrl: () => baseUrl);
   static const Duration _timeout = Duration(seconds: 5);
 
   static String get baseUrl {
@@ -91,12 +94,7 @@ class ApiService {
   };
 
   static String? get _authToken {
-    try {
-      final token = DBService.settings().get('auth_token');
-      return token is String && token.isNotEmpty ? token : null;
-    } catch (_) {
-      return null;
-    }
+    return TokenStore.instance.accessToken;
   }
 
   static Map<String, String> get _authHeaders => {
@@ -104,9 +102,7 @@ class ApiService {
     if (_authToken != null) 'Authorization': 'Bearer $_authToken',
   };
 
-  static Map<String, String> get _userHeaders => {
-    ..._authHeaders,
-  };
+  static Map<String, String> get _userHeaders => {..._authHeaders};
 
   static Map<String, String> _userHeadersFor(int userId) => _authHeaders;
 
@@ -146,7 +142,8 @@ class ApiService {
     String identifier,
     String password,
   ) async {
-    final response = await http
+    final generation = TokenStore.instance.generation;
+    final response = await client
         .post(
           _uri('/api/auth/login'),
           headers: _headers,
@@ -155,11 +152,34 @@ class ApiService {
         .timeout(_timeout);
     final body = _decode(response);
     final user = Map<String, dynamic>.from((body as Map)['user'] as Map);
-    final token = body['token']?.toString();
-    if (token != null && token.isNotEmpty) {
-      await DBService.settings().put('auth_token', token);
+    final saved = await TokenStore.instance.save(
+      Map<String, dynamic>.from(body),
+      expectedGeneration: generation,
+      newLogin: true,
+    );
+    if (!saved) {
+      throw ApiException('Phiên đăng nhập đã thay đổi. Vui lòng thử lại.');
     }
     return user;
+  }
+
+  static Future<void> logout({bool allDevices = false}) async {
+    final generation = TokenStore.instance.generation;
+    if (allDevices && !TokenStore.instance.hasSession) {
+      throw ApiException(
+        'Vui lòng đăng nhập để thu hồi phiên trên tất cả thiết bị.',
+      );
+    }
+    if (TokenStore.instance.hasSession) {
+      final response = await client
+          .post(_uri(allDevices ? '/api/auth/logout-all' : '/api/auth/logout'))
+          .timeout(const Duration(seconds: 20));
+      // Never report remote revocation as successful while offline or after a server failure.
+      _decode(response);
+    }
+    if (generation == TokenStore.instance.generation) {
+      await DBService.clearAuthSession();
+    }
   }
 
   static Future<void> register({
@@ -169,7 +189,7 @@ class ApiService {
     required String phone,
     String? address,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/auth/register'),
           headers: _headers,
@@ -186,7 +206,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> forgotPasswordEmail(String email) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/auth/forgot-password/email'),
           headers: _headers,
@@ -197,7 +217,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> forgotPasswordPhone(String phone) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/auth/forgot-password/phone'),
           headers: _headers,
@@ -212,7 +232,7 @@ class ApiService {
     required String type,
     required String otp,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/auth/verify-otp'),
           headers: _headers,
@@ -231,7 +251,7 @@ class ApiService {
     required String resetToken,
     required String newPassword,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/auth/reset-password'),
           headers: _headers,
@@ -245,7 +265,9 @@ class ApiService {
   }
 
   static Future<List<User>> fetchUsers() async {
-    final response = await http.get(_uri('/api/users'), headers: _authHeaders).timeout(_timeout);
+    final response = await client
+        .get(_uri('/api/users'), headers: _authHeaders)
+        .timeout(_timeout);
     final body = _decode(response);
     return _dataList(
       body,
@@ -253,7 +275,7 @@ class ApiService {
   }
 
   static Future<User> createUser(User user) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/users'),
           headers: _authHeaders,
@@ -265,7 +287,7 @@ class ApiService {
   }
 
   static Future<User> updateUser(int userId, User user) async {
-    final response = await http
+    final response = await client
         .put(
           _uri('/api/users/$userId'),
           headers: _authHeaders,
@@ -283,7 +305,7 @@ class ApiService {
     required String address,
     String? password,
   }) async {
-    final response = await http
+    final response = await client
         .put(
           _uri('/api/users/$userId/profile'),
           headers: _userHeadersFor(userId),
@@ -299,7 +321,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> fetchEmployeeSummary(int userId) async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/users/$userId/employee-summary'), headers: _authHeaders)
         .timeout(_shiftTimeout);
     return _dataMap(_decode(response));
@@ -310,7 +332,7 @@ class ApiService {
     required int year,
     required int month,
   }) async {
-    final response = await http
+    final response = await client
         .get(
           _uri(
             '/api/employee-schedules/employee/$employeeId/month?year=$year&month=$month',
@@ -329,7 +351,7 @@ class ApiService {
     String? note,
     int? setBy,
   }) async {
-    final response = await http
+    final response = await client
         .put(
           _uri('/api/employee-schedules/employee/$employeeId/day'),
           headers: _authHeaders,
@@ -348,7 +370,7 @@ class ApiService {
     required int year,
     required int month,
   }) async {
-    final response = await http
+    final response = await client
         .get(
           _uri(
             '/api/employee-schedules/overview/month?year=$year&month=$month',
@@ -369,7 +391,7 @@ class ApiService {
     required int year,
     required int month,
   }) async {
-    final response = await http
+    final response = await client
         .get(
           _uri('/api/work-shifts/employee/$employeeId?year=$year&month=$month'),
           headers: _authHeaders,
@@ -392,7 +414,9 @@ class ApiService {
       if (dateFilter != 'all') 'date_filter': dateFilter,
     };
     final uri = _uri('/api/work-shifts').replace(queryParameters: query);
-    final response = await http.get(uri, headers: _authHeaders).timeout(_shiftTimeout);
+    final response = await client
+        .get(uri, headers: _authHeaders)
+        .timeout(_shiftTimeout);
     final body = _decode(response);
     return _dataList(body)
         .map((e) => WorkShift.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -400,7 +424,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> startWorkShift(int employeeId) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/work-shifts/start'),
           headers: _authHeaders,
@@ -411,7 +435,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> endWorkShift(int employeeId) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/work-shifts/end'),
           headers: _authHeaders,
@@ -422,14 +446,16 @@ class ApiService {
   }
 
   static Future<void> deleteUser(int userId) async {
-    final response = await http
+    final response = await client
         .delete(_uri('/api/users/$userId'), headers: _authHeaders)
         .timeout(_timeout);
     _decode(response);
   }
 
   static Future<List<Map<String, dynamic>>> fetchCategories() async {
-    final response = await http.get(_uri('/api/categories')).timeout(_timeout);
+    final response = await client
+        .get(_uri('/api/categories'))
+        .timeout(_timeout);
     final body = _decode(response);
     return _dataList(
       body,
@@ -437,7 +463,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> createCategory(String name) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/categories'),
           headers: _authHeaders,
@@ -448,7 +474,7 @@ class ApiService {
   }
 
   static Future<List<Product>> fetchProducts() async {
-    final response = await http.get(_uri('/api/products')).timeout(_timeout);
+    final response = await client.get(_uri('/api/products')).timeout(_timeout);
     final body = _decode(response);
     return _dataList(body)
         .map((e) => Product.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -456,7 +482,7 @@ class ApiService {
   }
 
   static Future<Product> createProduct(Product product) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/products'),
           headers: _authHeaders,
@@ -467,7 +493,7 @@ class ApiService {
   }
 
   static Future<Product> updateProduct(Product product) async {
-    final response = await http
+    final response = await client
         .put(
           _uri('/api/products/${product.id}'),
           headers: _authHeaders,
@@ -478,21 +504,21 @@ class ApiService {
   }
 
   static Future<void> deleteProduct(String productId) async {
-    final response = await http
+    final response = await client
         .delete(_uri('/api/products/$productId'))
         .timeout(_timeout);
     _decode(response);
   }
 
   static Future<Map<String, dynamic>> scanProductCode(String code) async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/products/scan/${Uri.encodeComponent(code)}'))
         .timeout(_timeout);
     return _dataMap(_decode(response));
   }
 
   static Future<bool> productCodeExists(String code) async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/products/check-code/${Uri.encodeComponent(code)}'))
         .timeout(_timeout);
     final body = _dataMap(_decode(response));
@@ -503,7 +529,7 @@ class ApiService {
     int? categoryId,
     String? prefix,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/products/generate-code'),
           headers: _authHeaders,
@@ -521,18 +547,34 @@ class ApiService {
     final token = _authToken;
     if (token == null) throw ApiException('Vui lòng đăng nhập để tải ảnh');
     final extension = filePath.split('.').last.toLowerCase();
-    const types = {'jpg': 'jpeg', 'jpeg': 'jpeg', 'png': 'png', 'gif': 'gif', 'webp': 'webp'};
+    const types = {
+      'jpg': 'jpeg',
+      'jpeg': 'jpeg',
+      'png': 'png',
+      'gif': 'gif',
+      'webp': 'webp',
+    };
     final subtype = types[extension];
-    if (subtype == null) throw ApiException('Vui lòng chọn ảnh JPG, PNG, GIF hoặc WebP');
+    if (subtype == null) {
+      throw ApiException('Vui lòng chọn ảnh JPG, PNG, GIF hoặc WebP');
+    }
     final request = http.MultipartRequest(
       'POST',
       _uri('/api/uploads/product-image'),
     );
     request.headers['Authorization'] = 'Bearer $token';
-    final file = await http.MultipartFile.fromPath('image', filePath, contentType: MediaType('image', subtype));
-    if (file.length > 5 * 1024 * 1024) throw ApiException('Ảnh không được vượt quá 5 MB');
+    final file = await http.MultipartFile.fromPath(
+      'image',
+      filePath,
+      contentType: MediaType('image', subtype),
+    );
+    if (file.length > 5 * 1024 * 1024) {
+      throw ApiException('Ảnh không được vượt quá 5 MB');
+    }
     request.files.add(file);
-    final streamed = await request.send().timeout(const Duration(seconds: 30));
+    final streamed = await client
+        .send(request)
+        .timeout(const Duration(seconds: 30));
     final response = await http.Response.fromStream(streamed);
     final body = _dataMap(_decode(response));
     final rawUrl = (body['url'] ?? body['image_url'] ?? '').toString();
@@ -543,7 +585,9 @@ class ApiService {
   }
 
   static Future<List<Order>> fetchOrders() async {
-    final response = await http.get(_uri('/api/orders'), headers: _authHeaders).timeout(_timeout);
+    final response = await client
+        .get(_uri('/api/orders'), headers: _authHeaders)
+        .timeout(_timeout);
     final body = _decode(response);
     return _dataList(
       body,
@@ -551,7 +595,7 @@ class ApiService {
   }
 
   static Future<List<Order>> fetchOnlineOrders() async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/orders/online'), headers: _userHeaders)
         .timeout(_timeout);
     final body = _decode(response);
@@ -564,7 +608,7 @@ class ApiService {
     final path = customerId == null
         ? '/api/orders/history'
         : '/api/orders/history/$customerId';
-    final response = await http
+    final response = await client
         .get(_uri(path), headers: _userHeaders)
         .timeout(_timeout);
     final body = _decode(response);
@@ -574,7 +618,7 @@ class ApiService {
   }
 
   static Future<List<Map<String, dynamic>>> fetchMyOrders(int userId) async {
-    final response = await http
+    final response = await client
         .get(_uri('/my-orders'), headers: _userHeadersFor(userId))
         .timeout(_timeout);
     final body = _decode(response);
@@ -586,7 +630,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> fetchPendingOrders(
     int employeeId,
   ) async {
-    final response = await http
+    final response = await client
         .get(_uri('/orders/pending'), headers: _userHeadersFor(employeeId))
         .timeout(_timeout);
     final body = _decode(response);
@@ -599,7 +643,7 @@ class ApiService {
     required int employeeId,
     required String orderId,
   }) async {
-    final response = await http
+    final response = await client
         .put(
           _uri('/orders/$orderId/confirm'),
           headers: _userHeadersFor(employeeId),
@@ -613,7 +657,7 @@ class ApiService {
     required String orderId,
     String? reason,
   }) async {
-    final response = await http
+    final response = await client
         .put(
           _uri('/orders/$orderId/reject'),
           headers: _userHeadersFor(employeeId),
@@ -630,7 +674,7 @@ class ApiService {
     required int userId,
     required String orderId,
   }) async {
-    final response = await http
+    final response = await client
         .put(
           _uri('/orders/$orderId/received'),
           headers: _userHeadersFor(userId),
@@ -640,14 +684,14 @@ class ApiService {
   }
 
   static Future<Order> fetchOrderDetail(String orderId) async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/orders/$orderId'), headers: _userHeaders)
         .timeout(_timeout);
     return Order.fromJson(_dataMap(_decode(response)));
   }
 
   static Future<Order> updateOrderStatus(String orderId, String status) async {
-    final response = await http
+    final response = await client
         .patch(
           _uri('/api/orders/$orderId/status'),
           headers: _userHeaders,
@@ -662,7 +706,7 @@ class ApiService {
     int? customerId,
     int? employeeId,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/orders'),
           headers: _authHeaders,
@@ -697,7 +741,7 @@ class ApiService {
       orderData['user_id'] = userId;
     }
 
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/orders'),
           headers: _authHeaders,
@@ -710,7 +754,7 @@ class ApiService {
   static Future<List<ProductReview>> fetchProductReviews(
     String productId,
   ) async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/reviews/products/$productId'))
         .timeout(_timeout);
     final body = _decode(response);
@@ -735,7 +779,7 @@ class ApiService {
       payload['order_id'] = int.tryParse(orderId) ?? orderId;
     }
 
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/reviews'),
           headers: customerId == null
@@ -758,7 +802,7 @@ class ApiService {
   }
 
   static Future<List<Map<String, dynamic>>> fetchInventoryLogs() async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/inventory/logs'))
         .timeout(_timeout);
     final body = _decode(response);
@@ -768,7 +812,7 @@ class ApiService {
   }
 
   static Future<List<InventoryItem>> fetchInventoryItems() async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/inventory/items'))
         .timeout(_timeout);
     final body = _decode(response);
@@ -778,7 +822,7 @@ class ApiService {
   }
 
   static Future<InventoryItem> createInventoryItem(InventoryItem item) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/inventory/items'),
           headers: _authHeaders,
@@ -789,7 +833,7 @@ class ApiService {
   }
 
   static Future<InventoryItem> updateInventoryItem(InventoryItem item) async {
-    final response = await http
+    final response = await client
         .put(
           _uri('/api/inventory/items/${item.id}'),
           headers: _authHeaders,
@@ -806,7 +850,7 @@ class ApiService {
     required double importPrice,
     String? note,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/inventory/import'),
           headers: _authHeaders,
@@ -823,7 +867,7 @@ class ApiService {
   }
 
   static Future<double?> fetchInventoryImportPrice(String barcode) async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/inventory/cost/$barcode'))
         .timeout(_timeout);
     final body = _dataMap(_decode(response));
@@ -839,7 +883,7 @@ class ApiService {
     required int actualQuantity,
     String? note,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/inventory/adjust'),
           headers: _authHeaders,
@@ -861,7 +905,7 @@ class ApiService {
     required int quantity,
     String? note,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/inventory/export'),
           headers: _authHeaders,
@@ -878,7 +922,7 @@ class ApiService {
   }
 
   static Future<Map<String, int>> fetchCart(int userId) async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/carts'), headers: _userHeadersFor(userId))
         .timeout(_timeout);
     final body = _dataMap(_decode(response));
@@ -897,7 +941,7 @@ class ApiService {
         items.add({'product_id': productId, 'quantity': entry.value});
       }
     }
-    final response = await http
+    final response = await client
         .put(
           _uri('/api/carts/update'),
           headers: _userHeadersFor(userId),
@@ -912,7 +956,7 @@ class ApiService {
     String productId,
     int quantity,
   ) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/carts/add'),
           headers: _userHeadersFor(userId),
@@ -937,7 +981,7 @@ class ApiService {
     final request = http.Request('DELETE', _uri('/api/carts/remove'))
       ..headers.addAll(_userHeadersFor(userId))
       ..body = jsonEncode({'product_id': int.tryParse(productId) ?? productId});
-    final streamed = await request.send().timeout(_timeout);
+    final streamed = await client.send(request).timeout(_timeout);
     final response = await http.Response.fromStream(streamed);
     final body = _dataMap(_decode(response));
     final items = (body['items'] as List?) ?? const [];
@@ -952,7 +996,7 @@ class ApiService {
     required double orderTotal,
     required int userId,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/vouchers/validate'),
           headers: _userHeadersFor(userId),
@@ -975,7 +1019,7 @@ class ApiService {
     required int orderId,
     String? bankCode,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/payments/vnpay/create'),
           headers: _userHeadersFor(userId),
@@ -992,7 +1036,7 @@ class ApiService {
     required int userId,
     required int orderId,
   }) async {
-    final response = await http
+    final response = await client
         .get(
           _uri('/api/orders/$orderId/payment-status'),
           headers: _userHeadersFor(userId),
@@ -1005,7 +1049,7 @@ class ApiService {
     String orderCode,
   ) async {
     final encodedCode = Uri.encodeComponent(orderCode.trim());
-    final response = await http
+    final response = await client
         .get(_uri('/api/orders/status/$encodedCode'), headers: _authHeaders)
         .timeout(_timeout);
     return _dataMap(_decode(response));
@@ -1018,7 +1062,7 @@ class ApiService {
     required int employeeId,
     String? orderId,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/api/points/add'),
           headers: _userHeadersFor(employeeId),
@@ -1046,7 +1090,9 @@ class ApiService {
     final uri = Uri.parse(
       '$baseUrl/api/points/customer',
     ).replace(queryParameters: query);
-    final response = await http.get(uri, headers: _authHeaders).timeout(_timeout);
+    final response = await client
+        .get(uri, headers: _authHeaders)
+        .timeout(_timeout);
     final decoded = _decode(response);
     return decoded is Map<String, dynamic>
         ? decoded
@@ -1061,7 +1107,7 @@ class ApiService {
     String? voucherCode,
     String? note,
   }) async {
-    final response = await http
+    final response = await client
         .post(
           _uri('/orders/checkout'),
           headers: _userHeadersFor(userId),
@@ -1081,7 +1127,7 @@ class ApiService {
   static Future<Map<String, dynamic>> fetchRevenueReport(
     int adminUserId,
   ) async {
-    final response = await http
+    final response = await client
         .get(_uri('/api/reports/revenue'), headers: _adminHeaders(adminUserId))
         .timeout(_timeout);
     return _dataMap(_decode(response));
@@ -1090,7 +1136,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> fetchProductPerformanceReport(
     int adminUserId,
   ) async {
-    final response = await http
+    final response = await client
         .get(
           _uri('/api/reports/product-performance'),
           headers: _adminHeaders(adminUserId),
@@ -1112,7 +1158,7 @@ class ApiService {
     final uri = _uri(
       '/api/performance/dashboard',
     ).replace(queryParameters: query);
-    final response = await http
+    final response = await client
         .get(uri, headers: _adminHeaders(adminUserId))
         .timeout(_timeout);
     debugPrint(

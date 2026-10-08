@@ -7,7 +7,9 @@
     "dev": "nodemon src/server.js",
     "test:vnpay": "node scripts/test-vnpay-sign.js",
     "test:upload": "node --test test/upload.test.js",
-    "test:security": "node --test test/security.test.js"
+    "test:security": "node --test test/security.test.js",
+    "test:session": "node --test test/session.test.js",
+    "migrate:auth": "node scripts/migrate-auth-sessions.js"
   },
   "keywords": [],
   "author": "",

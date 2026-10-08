@@ -6,13 +6,14 @@ const path = require('node:path');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
+const { createHash } = require('node:crypto');
 
 // Stub only database lookup; exercise real JWT auth, role guard and multipart parser.
 // Never connect to the configured cloud database during tests.
 process.env.JWT_SECRET = 'upload-test-only-secret';
 const users = { 1: 'admin', 2: 'employee', 3: 'customer' };
 require.cache[require.resolve('../src/config/db')] = { exports: {
-  execute: async (_sql, [id]) => [[users[id] ? { user_id: id, role_name: users[id], status: 'active' } : undefined].filter(Boolean)],
+  execute: async (_sql, [id]) => [[users[id] ? { user_id: id, role_name: users[id], status: 'active', password: 'test-hash', credential_hash: createHash('sha256').update('test-hash').digest('hex') } : undefined].filter(Boolean)],
 } };
 const { createUploadRouter } = require('../src/routes/upload.routes');
 
@@ -31,7 +32,7 @@ test('upload boundary and sanitized output', async (t) => {
     if (extra) form.append('image', new Blob([png], { type: 'image/png' }), 'second.png');
     return fetch(base + prefix + '/product-image', {
       method: 'POST', body: form, headers: {
-        ...(id ? { Authorization: 'Bearer ' + jwt.sign({ id }, process.env.JWT_SECRET) } : {}), ...headers,
+        ...(id ? { Authorization: 'Bearer ' + jwt.sign({ user_id: id, sid: 'test-session', purpose: 'access' }, process.env.JWT_SECRET) } : {}), ...headers,
       },
     });
   };

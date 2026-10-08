@@ -1,3 +1,4 @@
+import '../services/token_store.dart';
 import 'package:flutter/material.dart';
 
 import '../models/product.dart';
@@ -108,7 +109,7 @@ class _CustomerOnlineCheckoutScreenState
       return;
     }
 
-    final token = (DBService.settings().get('auth_token') ?? '').toString();
+    final token = (TokenStore.instance.accessToken ?? '').toString();
     final vouchers = await VoucherService.getUserVouchers(userId, token);
     if (!mounted) return;
     setState(() {

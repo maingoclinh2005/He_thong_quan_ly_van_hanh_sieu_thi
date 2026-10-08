@@ -62,6 +62,7 @@ ios/Pods/
 *.key
 *secret*
 *token*
+!lib/services/token_store.dart
 *api-key*
 *API_KEY*
 *.sqlite
