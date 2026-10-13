@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "test:order": "node --test test/order.*.test.js",
+    "test:inventory": "node --test test/inventory.*.test.js",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test:vnpay": "node scripts/test-vnpay-sign.js",
