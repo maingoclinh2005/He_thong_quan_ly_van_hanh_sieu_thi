@@ -14,6 +14,7 @@ import '../models/inventory_item.dart';
 import 'db_service.dart';
 import 'token_store.dart';
 import 'session_client.dart';
+import 'api_contract.dart';
 import '../utils/constants.dart';
 
 // Ca làm / tổng hợp nhân viên có thể chậm hơn API thông thường.
@@ -111,7 +112,7 @@ class ApiService {
   static dynamic _decode(http.Response response) {
     final body = response.body.isEmpty
         ? <String, dynamic>{}
-        : jsonDecode(utf8.decode(response.bodyBytes));
+        : ApiContract.decode(utf8.decode(response.bodyBytes));
     if (response.statusCode >= 400) {
       final message = body is Map && body['message'] != null
           ? body['message'].toString()
@@ -619,7 +620,7 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> fetchMyOrders(int userId) async {
     final response = await client
-        .get(_uri('/my-orders'), headers: _userHeadersFor(userId))
+        .get(_uri('/api/my-orders'), headers: _userHeadersFor(userId))
         .timeout(_timeout);
     final body = _decode(response);
     return _dataList(
@@ -631,7 +632,7 @@ class ApiService {
     int employeeId,
   ) async {
     final response = await client
-        .get(_uri('/orders/pending'), headers: _userHeadersFor(employeeId))
+        .get(_uri('/api/orders/pending'), headers: _userHeadersFor(employeeId))
         .timeout(_timeout);
     final body = _decode(response);
     return _dataList(
@@ -645,7 +646,7 @@ class ApiService {
   }) async {
     final response = await client
         .put(
-          _uri('/orders/$orderId/confirm'),
+          _uri('/api/orders/$orderId/confirm'),
           headers: _userHeadersFor(employeeId),
         )
         .timeout(_timeout);
@@ -659,7 +660,7 @@ class ApiService {
   }) async {
     final response = await client
         .put(
-          _uri('/orders/$orderId/reject'),
+          _uri('/api/orders/$orderId/reject'),
           headers: _userHeadersFor(employeeId),
           body: jsonEncode({
             if (reason != null && reason.trim().isNotEmpty)
@@ -676,7 +677,7 @@ class ApiService {
   }) async {
     final response = await client
         .put(
-          _uri('/orders/$orderId/received'),
+          _uri('/api/orders/$orderId/received'),
           headers: _userHeadersFor(userId),
         )
         .timeout(_timeout);
@@ -1109,7 +1110,7 @@ class ApiService {
   }) async {
     final response = await client
         .post(
-          _uri('/orders/checkout'),
+          _uri('/api/orders/checkout'),
           headers: _userHeadersFor(userId),
           body: jsonEncode({
             'delivery_method': deliveryMethod,

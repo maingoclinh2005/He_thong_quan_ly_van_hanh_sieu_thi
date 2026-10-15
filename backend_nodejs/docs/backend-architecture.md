@@ -1,5 +1,7 @@
 # Tách kiến trúc backend — đơn hàng và kho
 
+Lưu ý cập nhật 15/10/2026: phần mô tả giữ alias/field dưới đây ghi lại thời điểm refactor. Hợp đồng HTTP hiện tại theo [api-contract.md](api-contract.md): một prefix `/api`, JSON snake_case và alias ứng dụng cũ trả 410.
+
 ## Phạm vi đã hoàn thành
 
 Toàn bộ 14 khai báo route trong `order.routes.js` (bao gồm hai đường dẫn lịch sử), alias `/api/orders` và `/orders`, cùng `/my-orders` đã chuyển sang controller → service → repository. Đợt tiếp theo đã chuyển cả 8 endpoint của `inventory.routes.js`. Các module auth, payment/webhook, upload, user, voucher, report và ca làm **chưa** chuyển toàn bộ theo kiến trúc này; không coi đây là refactor xong mọi backend.

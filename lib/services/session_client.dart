@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'token_store.dart';
+import 'api_contract.dart';
 
 /// One shared client for normal requests, vouchers and multipart uploads.
 class SessionClient extends http.BaseClient {
@@ -67,7 +68,15 @@ class SessionClient extends http.BaseClient {
     final protected = !_publicAuth.contains(request.url.path);
     final generation = _tokens.generation;
     final sentToken = protected ? _tokens.accessToken : null;
-    final bytes = await request.finalize().toBytes();
+    var bytes = await request.finalize().toBytes();
+    final contentType = request.headers['content-type'] ?? '';
+    if (bytes.isNotEmpty &&
+        contentType.split(';').first.trim().toLowerCase() ==
+            'application/json') {
+      bytes = utf8.encode(
+        jsonEncode(ApiContract.toWire(jsonDecode(utf8.decode(bytes)))),
+      );
+    }
     http.Request copy(String? token) =>
         http.Request(request.method, request.url)
           ..followRedirects = false
