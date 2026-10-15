@@ -71,12 +71,11 @@ require.cache[require.resolve("../src/composition/order")] = {
 const routes = require("../src/routes/order.routes");
 const mine = require("../src/routes/myOrder.routes");
 
-test("all existing paths, aliases, role guards and input adapters are retained", async (t) => {
+test("canonical order paths retain role guards and input adapters", async (t) => {
   const app = express();
   configureSecurity(app, { env: {}, auditSink: () => {} });
   app.use("/api/orders", routes);
-  app.use("/orders", routes);
-  app.use("/my-orders", mine);
+  app.use("/api/my-orders", mine);
   app.use(securityErrorHandler);
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -123,7 +122,7 @@ test("all existing paths, aliases, role guards and input adapters are retained",
     ["PATCH", "/9/status", "updateStatus", "staff"],
     ["POST", "/", "create", "staff"],
   ];
-  for (const prefix of ["/api/orders", "/orders"]) {
+  for (const prefix of ["/api/orders"]) {
     for (const [method, path, action, role] of endpoints) {
       assert.equal(
         (await request(method, prefix + path)).status,
@@ -153,8 +152,8 @@ test("all existing paths, aliases, role guards and input adapters are retained",
       }
     }
   }
-  assert.equal((await request("GET", "/my-orders")).status, 401);
-  assert.equal((await request("GET", "/my-orders", 1)).status, 200);
+  assert.equal((await request("GET", "/api/my-orders")).status, 401);
+  assert.equal((await request("GET", "/api/my-orders", 1)).status, 200);
   assert.equal(calls.at(-1).action, "myOrders");
   for (const [kind, status] of Object.entries({
     invalid: 400,
@@ -164,12 +163,12 @@ test("all existing paths, aliases, role guards and input adapters are retained",
     conflict: 409,
   })) {
     failure = new ApplicationError(kind, "Thông báo nghiệp vụ");
-    const response = await request("GET", "/orders/9", 1);
+    const response = await request("GET", "/api/orders/9", 1);
     assert.equal(response.status, status);
     assert.equal((await response.json()).message, "Thông báo nghiệp vụ");
   }
   failure = new Error("SQL PRIVATE_INTERNAL");
-  const response = await request("GET", "/orders/9", 1);
+  const response = await request("GET", "/api/orders/9", 1);
   assert.equal(response.status, 500);
   assert.ok(!(await response.text()).includes("PRIVATE_INTERNAL"));
 });

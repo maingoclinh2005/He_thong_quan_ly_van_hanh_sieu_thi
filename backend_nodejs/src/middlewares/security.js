@@ -76,7 +76,7 @@ function configureSecurity(app, { env = process.env, auditSink = record => conso
     },
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['X-Request-ID', 'RateLimit', 'RateLimit-Policy', 'Retry-After'],
+    exposedHeaders: ['X-Request-ID', 'RateLimit', 'RateLimit-Policy', 'Retry-After', 'Deprecation', 'Link'],
     credentials: false, maxAge: 600,
   }));
   app.use(express.json({ limit: '100kb', inflate: false }));

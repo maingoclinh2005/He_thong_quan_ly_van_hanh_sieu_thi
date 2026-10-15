@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../models/voucher.dart';
 import 'api_service.dart';
+import 'api_contract.dart';
 
 class VoucherService {
   static String get baseUrl => '${ApiService.baseUrl}/api/vouchers';
@@ -39,7 +40,7 @@ class VoucherService {
           );
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         if (json['success'] == true && json['voucher'] != null) {
           final voucherData = json['voucher'];
           return {
@@ -63,7 +64,7 @@ class VoucherService {
         }
         return {'success': false, 'message': 'Dữ liệu voucher không hợp lệ'};
       } else {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         return {
           'success': false,
           'message': json['message'] ?? 'Lỗi validate voucher',
@@ -90,7 +91,7 @@ class VoucherService {
           );
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         List<dynamic> data = json['data'] ?? [];
         return data.map((v) => Voucher.fromJson(v)).toList();
       }
@@ -117,7 +118,7 @@ class VoucherService {
           );
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         return Voucher.fromJson(json['data']);
       }
       return null;
@@ -143,7 +144,7 @@ class VoucherService {
           );
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         List<dynamic> data = json['data'] ?? [];
         return data.map((v) => Voucher.fromJson(v)).toList();
       }
@@ -172,7 +173,7 @@ class VoucherService {
             },
           );
 
-      final json = jsonDecode(response.body);
+      final json = ApiContract.decode(response.body);
       if (response.statusCode == 200) {
         return {
           'success': true,
@@ -228,7 +229,7 @@ class VoucherService {
           );
 
       if (response.statusCode == 201) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         return {
           'success': true,
           'message': json['message'],
@@ -237,7 +238,7 @@ class VoucherService {
       } else if (response.statusCode == 403) {
         return {'success': false, 'message': 'Bạn không có quyền tạo voucher'};
       } else {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         return {
           'success': false,
           'message': json['message'] ?? 'Lỗi tạo voucher',
@@ -261,7 +262,7 @@ class VoucherService {
           );
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         List<dynamic> data = json['data'] ?? [];
         return data.map((v) => Voucher.fromJson(v)).toList();
       }
@@ -309,10 +310,10 @@ class VoucherService {
           );
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         return {'success': true, 'message': json['message']};
       } else {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         return {
           'success': false,
           'message': json['message'] ?? 'Lỗi cập nhật voucher',
@@ -339,10 +340,10 @@ class VoucherService {
           );
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         return {'success': true, 'message': json['message']};
       } else {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         return {
           'success': false,
           'message': json['message'] ?? 'Lỗi xóa voucher',
@@ -369,7 +370,7 @@ class VoucherService {
           );
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
+        final json = ApiContract.decode(response.body);
         List<dynamic> data = json['data'] ?? [];
         return List<Map<String, dynamic>>.from(data);
       }
