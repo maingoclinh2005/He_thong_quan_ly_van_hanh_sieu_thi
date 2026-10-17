@@ -26,10 +26,10 @@ function formatTimeOnly(value) {
 }
 
 async function getEmployee(employeeId) {
-  const hasEmploymentType = await columnExists('users', 'employment_type');
+
   const [rows] = await pool.execute(
     `SELECT u.user_id, u.full_name,
-            ${hasEmploymentType ? 'u.employment_type' : "'full_time' AS employment_type"},
+            u.employment_type,
             r.role_name
      FROM users u
      JOIN roles r ON r.role_id = u.role_id
@@ -39,27 +39,7 @@ async function getEmployee(employeeId) {
   return rows[0] || null;
 }
 
-async function tableExists(tableName) {
-  const [rows] = await pool.execute(
-    `SELECT COUNT(*) AS count
-     FROM information_schema.TABLES
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
-    [tableName]
-  );
-  return Number(rows[0]?.count || 0) > 0;
-}
 
-async function columnExists(tableName, columnName) {
-  const [rows] = await pool.execute(
-    `SELECT COUNT(*) AS count
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = ?
-       AND COLUMN_NAME = ?`,
-    [tableName, columnName]
-  );
-  return Number(rows[0]?.count || 0) > 0;
-}
 
 async function resolveDayStatus(employee, workDate, overrideRow, shiftRow) {
   const employmentType = employee.employment_type || 'full_time';
@@ -122,9 +102,6 @@ async function assertCanStartShift(employeeId, workDate) {
     return { ok: false, status: 404, message: 'Không tìm thấy nhân viên' };
   }
 
-  if (!(await tableExists('employee_day_overrides'))) {
-    return { ok: true };
-  }
 
   const [overrides] = await pool.execute(
     `SELECT day_status, note FROM employee_day_overrides
@@ -160,7 +137,7 @@ router.get('/employee/:employeeId/month', requireAuth, requireSelfOrRoles('admin
     const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
     let overrides = [];
-    if (await tableExists('employee_day_overrides')) {
+    {
       const [rows] = await pool.execute(
         `SELECT * FROM employee_day_overrides
          WHERE employee_id = ? AND work_date BETWEEN ? AND ?`,
@@ -228,12 +205,6 @@ router.get('/employee/:employeeId/month', requireAuth, requireSelfOrRoles('admin
 
 router.put('/employee/:employeeId/day', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
-    if (!(await tableExists('employee_day_overrides'))) {
-      return res.status(500).json({
-        success: false,
-        message: 'Chưa có bảng employee_day_overrides. Chạy migration 2026-05-17-employee-schedule.sql',
-      });
-    }
 
     const employeeId = Number(req.params.employeeId);
     const workDate = req.body.work_date || req.body.workDate;
@@ -307,10 +278,9 @@ router.get('/overview/month', requireAuth, requireRoles('admin'), async (req, re
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
-    const hasEmploymentType = await columnExists('users', 'employment_type');
     const [employees] = await pool.execute(
       `SELECT u.user_id, u.full_name,
-              ${hasEmploymentType ? 'u.employment_type' : "'full_time' AS employment_type"}
+              u.employment_type
        FROM users u
        JOIN roles r ON r.role_id = u.role_id
        WHERE r.role_name = 'employee' AND u.status = 'active'
@@ -318,7 +288,7 @@ router.get('/overview/month', requireAuth, requireRoles('admin'), async (req, re
     );
 
     let blockedCounts = {};
-    if (await tableExists('employee_day_overrides')) {
+    {
       const [rows] = await pool.execute(
         `SELECT employee_id, COUNT(*) AS blocked_days
          FROM employee_day_overrides

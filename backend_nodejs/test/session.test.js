@@ -6,7 +6,7 @@ const { once } = require('node:events');
 const { createHash } = require('node:crypto');
 process.env.JWT_SECRET = 'session-test-secret-not-for-production';
 const digest = value => createHash('sha256').update(value).digest('hex');
-const users = new Map([[1, { user_id: 1, password: 'hash1', password_hash: 'hash1', status: 'active', role_name: 'customer' }], [2, { user_id: 2, password: 'hash2', status: 'active', role_name: 'admin' }]]);
+const users = new Map([[1, { user_id: 1, password_hash: 'hash1', status: 'active', role_name: 'customer' }], [2, { user_id: 2, password_hash: 'hash2', status: 'active', role_name: 'admin' }]]);
 const sessions = new Map();
 const tokens = new Map();
 let transactionQueue = Promise.resolve();

@@ -14,7 +14,7 @@ function createOrderReadService(repository) {
     const items = await repository.findItems(id);
     return {
       ...normalizeOrder(row),
-      status: row.order_status || row.status,
+      status: row.status,
       items: items.map((item) => ({
         ...item,
         productId: String(item.product_id),
@@ -59,7 +59,7 @@ function createOrderReadService(repository) {
       const data = [];
       for (const row of rows) {
         const items = await repository.findCustomerItems(row.order_id);
-        const status = row.order_status || row.status || "pending";
+        const status = row.status || "pending";
         const displayStatus =
           status === "waiting_confirm"
             ? "pending"
@@ -74,7 +74,6 @@ function createOrderReadService(repository) {
           payment_method:
             row.payment_method || row.latest_payment_method || "cash",
           payment_status: row.payment_status || row.latest_payment_status,
-          order_status: row.order_status || row.status,
           display_order_status: displayStatus,
           rejection_reason:
             row.rejection_reason ||

@@ -24,7 +24,7 @@ require.cache[require.resolve("../src/config/db")] = {
               {
                 user_id: id,
                 role_name: roles[id],
-                password: "test",
+                password_hash: "test",
                 credential_hash: createHash("sha256")
                   .update("test")
                   .digest("hex"),

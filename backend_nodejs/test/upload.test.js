@@ -13,7 +13,7 @@ const { createHash } = require('node:crypto');
 process.env.JWT_SECRET = 'upload-test-only-secret';
 const users = { 1: 'admin', 2: 'employee', 3: 'customer' };
 require.cache[require.resolve('../src/config/db')] = { exports: {
-  execute: async (_sql, [id]) => [[users[id] ? { user_id: id, role_name: users[id], status: 'active', password: 'test-hash', credential_hash: createHash('sha256').update('test-hash').digest('hex') } : undefined].filter(Boolean)],
+  execute: async (_sql, [id]) => [[users[id] ? { user_id: id, role_name: users[id], status: 'active', password_hash: 'test-hash', credential_hash: createHash('sha256').update('test-hash').digest('hex') } : undefined].filter(Boolean)],
 } };
 const { createUploadRouter } = require('../src/routes/upload.routes');
 

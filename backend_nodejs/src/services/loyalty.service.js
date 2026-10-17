@@ -96,7 +96,7 @@ async function ensureCustomerByPhone(connection, { customerName, phone }) {
   const offlinePasswordHash = await hashPassword(`offline_${normalizedPhone}_${Date.now()}`);
   const [result] = await connection.execute(
     `INSERT INTO users
-      (full_name, email, phone, password, role_id, points, membership_code, status)
+      (full_name, email, phone, password_hash, role_id, points, membership_code, status)
      VALUES (?, ?, ?, ?, ?, 0, ?, 'active')`,
     [name, syntheticEmail, normalizedPhone, offlinePasswordHash, customerRoleId, membershipCode],
   );
@@ -136,18 +136,11 @@ async function transactionExists(connection, orderId, type) {
 }
 
 async function updateOrderLoyaltyColumns(connection, orderId, values) {
-  const [cols] = await connection.execute(
-    `SELECT COLUMN_NAME
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = 'orders'
-       AND COLUMN_NAME IN ('points_used', 'points_earned', 'points_discount')`,
-  );
-  const available = new Set(cols.map((row) => row.COLUMN_NAME));
+  const available = new Set(["points_used", "points_earned", "points_discount"]);
   const setParts = [];
   const params = [];
   for (const [column, value] of Object.entries(values)) {
-    if (!available.has(column)) continue;
+    if (!available.has(column)) throw new Error("Unsupported loyalty column");
     setParts.push(`${column} = ?`);
     params.push(value);
   }

@@ -104,7 +104,6 @@ function createOrderCheckoutService(repository, read) {
           payment_method: paymentMethod,
           status: "pending",
           payment_status: paymentStatus,
-          order_status: "pending",
           shipping_address:
             deliveryMethod === "delivery" ? shippingAddress : null,
           note,

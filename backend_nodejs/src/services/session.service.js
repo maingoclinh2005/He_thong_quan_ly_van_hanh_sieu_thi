@@ -4,7 +4,7 @@ const pool = require('../config/db');
 const ACCESS_SECONDS = 15 * 60;
 const REFRESH_SECONDS = 30 * 24 * 60 * 60;
 const hash = value => createHash('sha256').update(String(value)).digest('hex');
-const credentialHash = user => hash(user.password_hash || user.password);
+const credentialHash = user => hash(user.password_hash);
 const invalid = () => Object.assign(new Error('Phiên đăng nhập hết hạn hoặc đã bị thu hồi. Vui lòng đăng nhập lại.'), { status: 401 });
 
 function accessToken(userId, sessionId) {

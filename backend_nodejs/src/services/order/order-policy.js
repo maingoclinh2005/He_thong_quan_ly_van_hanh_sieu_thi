@@ -1,5 +1,5 @@
 function normalizeOrder(row) {
-  const orderStatus = row.order_status || row.status;
+  const orderStatus = row.status;
   return {
     ...row,
     id: String(row.order_id),
@@ -7,7 +7,6 @@ function normalizeOrder(row) {
     totalAmount: Number(row.final_amount),
     customerName: row.customer_name || "Khách lẻ",
     status: orderStatus,
-    orderStatus,
     paymentStatus: row.payment_status || row.latest_payment_status,
     paymentMethod: row.payment_method || row.latest_payment_method || "cash",
     transferContent: row.transfer_content || null,

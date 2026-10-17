@@ -1,5 +1,7 @@
 # Tách kiến trúc backend — đơn hàng và kho
 
+Cập nhật 17/10/2026: runtime đã chuyển sang schema cố định, bỏ metadata probing và fallback cột cũ. Xem [migrations.md](migrations.md) trước khi triển khai; các mô tả schema cũ/mới bên dưới là ghi chép của đợt refactor trước.
+
 Lưu ý cập nhật 15/10/2026: phần mô tả giữ alias/field dưới đây ghi lại thời điểm refactor. Hợp đồng HTTP hiện tại theo [api-contract.md](api-contract.md): một prefix `/api`, JSON snake_case và alias ứng dụng cũ trả 410.
 
 ## Phạm vi đã hoàn thành

@@ -383,13 +383,10 @@ router.post("/vnpay/create", requireAuth, async (req, res) => {
     }
 
     const txnRef = vnpay.buildTxnRef(orderId);
-    const columns = await orderPayment.ordersColumns(pool);
-    if (columns.has("transaction_id")) {
       await pool.execute("UPDATE orders SET transaction_id = ? WHERE order_id = ?", [
         txnRef,
         orderId,
       ]);
-    }
 
     const bankCode = String(req.body.bank_code || req.body.bankCode || "").trim();
     const { paymentUrl, vnpAmount } = vnpay.createPaymentUrl({

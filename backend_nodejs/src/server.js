@@ -99,7 +99,7 @@ app.use(securityErrorHandler);
 
 const PORT = process.env.PORT || 3000;
 
-if (require.main === module) app.listen(PORT, "0.0.0.0", () => {
+if (require.main === module) require("./schema-version").assertSchemaVersion(pool).then(() => app.listen(PORT, "0.0.0.0", () => {
   if (process.env.NODE_ENV === 'production' || process.env.REQUIRE_HTTPS === 'true') {
     console.log(`API upstream port ${PORT}; chỉ nhận HTTPS qua reverse proxy tin cậy.`);
     return;
@@ -109,6 +109,10 @@ if (require.main === module) app.listen(PORT, "0.0.0.0", () => {
     "Điện thoại thật (cùng Wi-Fi): dùng IP máy tính, ví dụ http://192.168.x.x:" +
       PORT,
   );
+})).catch(async () => {
+  console.error("Backend not started: database unavailable or migration version incompatible. Run npm run migrate:status.");
+  process.exitCode = 1;
+  await pool.end();
 });
 
 module.exports = app;

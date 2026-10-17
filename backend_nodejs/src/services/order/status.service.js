@@ -10,7 +10,7 @@ function createOrderStatusService(repository, read) {
       if (!order)
         throw new ApplicationError("not_found", "Không tìm thấy đơn hàng");
       const current = normalizeOrderStatus(
-        order.order_status || order.status,
+        order.status,
         order.order_type,
       );
       if (action === "received") {
