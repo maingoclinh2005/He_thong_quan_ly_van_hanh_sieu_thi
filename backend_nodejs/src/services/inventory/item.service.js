@@ -1,3 +1,4 @@
+const { quantity } = require("../../domain/stock");
 const { ApplicationError } = require("../../errors/application-error");
 
 function toInventoryItem(row) {
@@ -61,13 +62,14 @@ function createInventoryItemService(repository) {
         throw new ApplicationError("invalid", "Vui lòng nhập category_id");
       try {
         const id = await repository.create({
+          actorId: input.employee_id,
           barcode: input.barcode,
           name,
           imageUrl: input.image_url || null,
           price: Number(input.price),
           importPrice: importPrice == null ? null : Number(importPrice),
           unit: input.unit || "sp",
-          stock: Number(input.stock ?? input.stockQuantity ?? 0),
+          stock: quantity(input.stock ?? input.stockQuantity ?? 0),
           categoryId: Number(input.category_id ?? input.categoryId),
         });
         return {
@@ -86,6 +88,7 @@ function createInventoryItemService(repository) {
       validateImportPrice(importPrice);
       try {
         await repository.update(id, {
+          actorId: input.employee_id,
           barcode: input.barcode || null,
           name: input.item_name || input.name || null,
           imageUrl: input.image_url ?? null,
@@ -95,7 +98,7 @@ function createInventoryItemService(repository) {
           stock:
             input.stock == null && input.stockQuantity == null
               ? null
-              : Number(input.stock ?? input.stockQuantity),
+              : quantity(input.stock ?? input.stockQuantity),
           categoryId:
             input.category_id == null && input.categoryId == null
               ? null

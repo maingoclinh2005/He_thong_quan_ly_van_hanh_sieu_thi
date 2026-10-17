@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:async';
 import '../models/product.dart';
@@ -874,54 +875,47 @@ class DBService {
     return null;
   }
 
+  static final Map<String, Future<Product>> _stockTransfers = {};
   static Future<Product> releaseInventoryToShelf({
     required InventoryItem item,
     required int quantity,
     required int categoryId,
+  }) {
+    final key = '${item.id}:$quantity';
+    return _stockTransfers.putIfAbsent(
+      key,
+      () => _releaseInventoryToShelf(
+        item: item,
+        quantity: quantity,
+        categoryId: categoryId,
+      ).whenComplete(() => _stockTransfers.remove(key)),
+    );
+  }
+
+  static Future<Product> _releaseInventoryToShelf({
+    required InventoryItem item,
+    required int quantity,
+    required int categoryId,
   }) async {
-    Product? existing;
-    for (final product in products().values) {
-      if (product.barcode == item.id || product.id == item.id) {
-        existing = product;
-        break;
-      }
-    }
-
-    Product saved;
-    final imageUrl = item.imageUrl ?? productImages().get(item.id);
-    if (existing != null) {
-      existing.stockQuantity += quantity;
-      existing.imageUrl ??= imageUrl;
-      saved = await updateProductRemote(existing);
-    } else {
-      saved = await createProduct(
-        Product(
-          id: '0',
-          name: item.name,
-          price: item.price,
-          unit: item.unit,
-          barcode: item.id,
-          stockQuantity: quantity,
-          categoryId: categoryId,
-          imageUrl: imageUrl,
-        ),
-      );
-    }
-
     final employeeId = settings().get('current_user_id') as int?;
-    if (employeeId == null) {
-      throw ApiException('Chưa có current_user_id để ghi lịch sử xuất kho');
-    }
-    await ApiService.exportInventory(
+    if (employeeId == null) throw ApiException('Vui lòng đăng nhập lại');
+    // Keep the same key after a timeout/restart so retry cannot transfer twice.
+    final pendingKey = 'pending_transfer_${item.id}_$quantity';
+    final requestKey =
+        settings().get(pendingKey) as String? ??
+        'transfer_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 32)}';
+    await settings().put(pendingKey, requestKey);
+    final saved = await ApiService.exportInventory(
       inventoryItemId: item.id,
-      productId: saved.id,
       employeeId: employeeId,
       quantity: quantity,
+      requestKey: requestKey,
       note: 'Đưa hàng lên kệ',
     );
     await syncProductsFromApi();
     await syncInventoryItemsFromApi();
     await syncInventoryHistoryFromApi();
+    await settings().delete(pendingKey);
     return products().get(saved.id) ?? saved;
   }
 

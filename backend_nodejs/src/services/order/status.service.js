@@ -36,6 +36,7 @@ function createOrderStatusService(repository, read) {
             "conflict",
             "Đơn hàng không còn ở trạng thái chờ xác nhận",
           );
+        if (action === "reject") await tx.reverseStock(id, currentUserId(actor));
         await tx.updateStatus(id, {
           status:
             action === "reject"
@@ -87,14 +88,22 @@ function createOrderStatusService(repository, read) {
         );
       }
       const normalized = normalizeOrderStatus(value, "online");
-      const affected = await repository.updateStatus(id, {
-        status: normalized,
-        employeeId: currentUserId(actor) || null,
-        confirmation: ["confirmed", "rejected"].includes(normalized),
-        onlyMissingConfirmation: true,
+      await repository.transaction(async tx => {
+        const order = await tx.lockOrder(id);
+        if (!order) throw new ApplicationError("not_found", "Không tìm thấy đơn hàng");
+        const current = normalizeOrderStatus(order.status, order.order_type);
+        if (current === normalized) return;
+        const allowed = { pending: ["confirmed", "shipping", "completed", "rejected"],
+          confirmed: ["shipping", "completed", "rejected"], shipping: ["completed", "rejected"],
+          completed: [], rejected: [] };
+        if (!allowed[current]?.includes(normalized))
+          throw new ApplicationError("conflict", "Không thể mở lại hoặc lùi trạng thái đơn đã xử lý");
+        if (normalized === "rejected") await tx.reverseStock(id, currentUserId(actor));
+        await tx.updateStatus(id, {
+          status: normalized, employeeId: currentUserId(actor) || null,
+          confirmation: ["confirmed", "rejected"].includes(normalized), onlyMissingConfirmation: true,
+        });
       });
-      if (!affected)
-        throw new ApplicationError("not_found", "Không tìm thấy đơn hàng");
       return {
         success: true,
         message: "Đã cập nhật trạng thái đơn hàng",

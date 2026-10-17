@@ -1,5 +1,8 @@
 const express = require('express');
 const pool = require('../config/db');
+const { withTransaction } = require('../repositories/transaction');
+const { createStockLedger, quantity } = require('../repositories/stock-ledger.repository');
+const { ApplicationError } = require('../errors/application-error');
 const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -221,7 +224,7 @@ router.post('/', requireAuth, requireRoles('admin'), async (req, res) => {
 
     const productName = product_name || name;
     const productBarcode = barcode || `P${Date.now()}`;
-    const productStock = Number(stock ?? stockQuantity ?? 0);
+    const productStock = quantity(stock ?? stockQuantity ?? 0);
     const productPrice = Number(price);
 
     if (!productName || price == null || !category_id) {
@@ -245,7 +248,8 @@ router.post('/', requireAuth, requireRoles('admin'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Giá bán không được nhỏ hơn giá nhập' });
     }
 
-    const [result] = await pool.execute(
+    const result = await withTransaction(pool, async tx => {
+    const [result] = await tx.execute(
       `INSERT INTO products
        (product_name, barcode, description, image_url, price, unit, stock, min_stock, category_id, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
@@ -256,12 +260,15 @@ router.post('/', requireAuth, requireRoles('admin'), async (req, res) => {
         image_url || null,
         productPrice,
         unit || 'sp',
-        productStock,
+        0,
         Number(min_stock ?? 10),
         Number(category_id),
       ]
     );
 
+    await createStockLedger(tx).set("shelf", result.insertId, productStock, req.user.user_id, "opening");
+    return result;
+    });
     const [rows] = await pool.execute(
       `SELECT p.*, c.category_name
        FROM products p
@@ -276,7 +283,7 @@ router.post('/', requireAuth, requireRoles('admin'), async (req, res) => {
       data: toProduct(rows[0]),
     });
   } catch (error) {
-    const status = error.code === 'ER_DUP_ENTRY' ? 409 : 500;
+    const status = error instanceof ApplicationError ? ({ invalid: 400, conflict: 409, not_found: 404 }[error.kind] || 500) : error.code === 'ER_DUP_ENTRY' ? 409 : 500;
     res.status(status).json({ success: false, message: 'Lỗi thêm sản phẩm', error: error.message });
   }
 });
@@ -315,7 +322,14 @@ router.put('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Giá bán không được nhỏ hơn giá nhập' });
     }
 
-    await pool.execute(
+    await withTransaction(pool, async tx => {
+    const ledger = createStockLedger(tx);
+    const { row: current } = await ledger.balance("shelf", req.params.id);
+    if ((barcode && barcode !== current.barcode) || (unit && unit !== current.unit))
+      throw new ApplicationError("conflict", "Không đổi mã hàng/đơn vị của tài khoản tồn kho");
+    if (stock != null || stockQuantity != null)
+      await ledger.set("shelf", req.params.id, stock ?? stockQuantity, req.user.user_id);
+    await tx.execute(
       `UPDATE products
        SET product_name = COALESCE(?, product_name),
            barcode = COALESCE(?, barcode),
@@ -323,7 +337,6 @@ router.put('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
            image_url = ?,
            price = COALESCE(?, price),
            unit = COALESCE(?, unit),
-           stock = COALESCE(?, stock),
            min_stock = COALESCE(?, min_stock),
            category_id = COALESCE(?, category_id),
            status = COALESCE(?, status)
@@ -335,7 +348,6 @@ router.put('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
         image_url ?? null,
         productPrice,
         unit || null,
-        stock == null && stockQuantity == null ? null : Number(stock ?? stockQuantity),
         min_stock == null ? null : Number(min_stock),
         category_id == null ? null : Number(category_id),
         status || null,
@@ -343,6 +355,7 @@ router.put('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
       ]
     );
 
+    });
     const [rows] = await pool.execute(
       `SELECT p.*, c.category_name
        FROM products p
@@ -360,7 +373,7 @@ router.put('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
       data: toProduct(rows[0]),
     });
   } catch (error) {
-    const status = error.code === 'ER_DUP_ENTRY' ? 409 : 500;
+    const status = error instanceof ApplicationError ? ({ invalid: 400, conflict: 409, not_found: 404 }[error.kind] || 500) : error.code === 'ER_DUP_ENTRY' ? 409 : 500;
     res.status(status).json({ success: false, message: 'Lỗi cập nhật sản phẩm', error: error.message });
   }
 });

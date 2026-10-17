@@ -52,6 +52,9 @@ function mockPool(fields = []) {
   const calls = [];
   const execute = async (sql, params) => {
     calls.push({ sql, params });
+    if (sql.startsWith("SELECT * FROM products")) return [[{ product_id: 3 }]];
+    if (sql.startsWith("SELECT delta")) return [[{ delta: 10 }]];
+    if (sql.includes("WHERE event_key")) return [[]];
     if (sql.includes("information_schema"))
       return [fields.map((COLUMN_NAME) => ({ COLUMN_NAME }))];
     return [{ affectedRows: 1, insertId: 9 }];
@@ -141,7 +144,8 @@ test("repository transaction binds writes to acquired connection", async () => {
     });
     await repository.clearCart(5);
   });
-  assert.equal(tx.calls.length, 5);
+  assert.equal(tx.calls.length, 9);
+  assert.ok(tx.calls.some(c => c.sql.startsWith("INSERT INTO inventory_ledger")));
 });
 
 test("query errors propagate without acquiring a leaked connection", async () => {

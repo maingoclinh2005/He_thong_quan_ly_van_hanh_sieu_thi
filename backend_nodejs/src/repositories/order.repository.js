@@ -1,4 +1,5 @@
 const { withTransaction } = require("./transaction");
+const { createStockLedger } = require("./stock-ledger.repository");
 
 const paymentJoinSql = `
   LEFT JOIN (
@@ -205,22 +206,18 @@ function createOrderRepository(pool, executor = pool) {
         )[0] || null
       );
     },
-    lockCartItems(cartId) {
-      return rows(
+    async lockCartItems(cartId) {
+      const items = await rows(
         `SELECT ci.product_id, ci.quantity, p.product_name, p.price, p.stock
         FROM cart_items ci JOIN products p ON p.product_id = ci.product_id WHERE ci.cart_id = ? FOR UPDATE`,
         [cartId],
       );
+      for (const item of [...items].sort((a,b) => a.product_id - b.product_id)) item.stock = (await createStockLedger(executor).balance("shelf", item.product_id)).total;
+      return items;
     },
     async lockProduct(id) {
-      return (
-        (
-          await rows(
-            "SELECT product_id, product_name, price, stock FROM products WHERE product_id = ? FOR UPDATE",
-            [id],
-          )
-        )[0] || null
-      );
+      const { row, total } = await createStockLedger(executor).balance("shelf", id);
+      return { ...row, stock: total };
     },
     async lockVoucher({ id, code, activeOnly = false }) {
       return (
@@ -263,16 +260,19 @@ function createOrderRepository(pool, executor = pool) {
         id,
       ]);
     },
-    async insertItemsAndReduceStock(orderId, items) {
+    reverseStock: (id, actorId) => createStockLedger(executor).reverseOrder(id, actorId),
+    async insertItemsAndReduceStock(orderId, items, actorId) {
+      const totals = new Map();
       for (const item of items) {
         await rows(
           `INSERT INTO order_items (order_id, product_id, quantity, price, subtotal) VALUES (?, ?, ?, ?, ?)`,
           [orderId, item.productId, item.quantity, item.price, item.subtotal],
         );
-        await rows(
-          "UPDATE products SET stock = stock - ? WHERE product_id = ?",
-          [item.quantity, item.productId],
-        );
+        totals.set(item.productId, (totals.get(item.productId) || 0) + Number(item.quantity));
+      }
+      for (const [id, delta] of [...totals].sort((a, b) => Number(a[0]) - Number(b[0]))) {
+        await createStockLedger(executor).post({ location: "shelf", id, delta: -delta, kind: "sale",
+          eventKey: "sale:" + orderId + ":" + id, orderId, actorId });
       }
     },
     async insertPayment(values) {

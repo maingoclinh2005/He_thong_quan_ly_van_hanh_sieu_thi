@@ -1,9 +1,9 @@
 const { ApplicationError } = require("../../errors/application-error");
+const { quantity } = require("../../domain/stock");
 
 function createInventoryMovementService(repository) {
-  // Preserve legacy validation, log actor supplied by the client and error categories.
-  // Hardening these contracts is deliberately separate from the structural refactor.
   function validate(input, adjustment = false) {
+    quantity(adjustment ? input.actual_quantity : input.quantity);
     const invalidQuantity = adjustment
       ? Number(input.actual_quantity) < 0
       : Number(input.quantity) <= 0;
@@ -25,12 +25,12 @@ function createInventoryMovementService(repository) {
     async importStock({ input }) {
       validate(input);
       const cost = input.import_price ?? input.importPrice;
-      if (cost == null || Number(cost) <= 0)
+      if (cost == null || !Number.isFinite(Number(cost)) || Number(cost) <= 0)
         throw new ApplicationError("invalid", "Giá nhập phải lớn hơn 0");
       await repository.transaction(async (tx) => {
         const item = await lock(tx, input.inventory_item_id);
         const itemId = Number(item.inventory_item_id);
-        await tx.importStock(itemId, Number(input.quantity), Number(cost));
+        await tx.importStock(itemId, Number(input.quantity), Number(cost), Number(input.employee_id));
         await tx.logImport({
           itemId,
           employeeId: Number(input.employee_id),
@@ -49,7 +49,7 @@ function createInventoryMovementService(repository) {
           actualQuantity = Number(input.actual_quantity),
           difference = actualQuantity - beforeStock;
         const itemId = Number(item.inventory_item_id);
-        await tx.adjustStock(itemId, actualQuantity);
+        await tx.adjustStock(itemId, actualQuantity, Number(input.employee_id));
         await tx.logAdjustment({
           itemId,
           employeeId: Number(input.employee_id),
@@ -62,21 +62,14 @@ function createInventoryMovementService(repository) {
     },
     async exportStock({ input }) {
       validate(input);
-      await repository.transaction(async (tx) => {
+      if (input.request_key != null && !/^[a-zA-Z0-9_-]{16,80}$/.test(input.request_key)) throw new ApplicationError("invalid", "request_key không hợp lệ");
+      const product = await repository.transaction(async (tx) => {
         const item = await lock(tx, input.inventory_item_id);
-        if (Number(item.stock) < Number(input.quantity))
-          throw new Error("Không đủ tồn kho");
         const itemId = Number(item.inventory_item_id);
-        await tx.exportStock(itemId, Number(input.quantity));
-        await tx.logExport({
-          itemId,
-          productId: input.product_id ? Number(input.product_id) : null,
-          employeeId: Number(input.employee_id),
-          quantity: -Number(input.quantity),
-          note: input.note || "Đưa hàng lên kệ",
-        });
+        const product = await tx.exportStock(itemId, Number(input.quantity), input.product_id, Number(input.employee_id), input.request_key);
+        return product;
       });
-      return { success: true, message: "Đã xuất hàng khỏi kho" };
+      return { success: true, message: "Đã chuyển hàng từ kho lên kệ", data: product };
     },
   };
 }

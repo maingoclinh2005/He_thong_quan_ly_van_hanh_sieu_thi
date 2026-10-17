@@ -16,13 +16,13 @@ function createInventoryController(service) {
         next(error);
       }
     };
-  const body = (req) => ({ input: req.body });
+  const body = (req) => ({ input: { ...req.body, employee_id: req.user.user_id } });
   return {
     list: handle("list", () => ({})),
     logs: handle("logs", () => ({})),
     cost: handle("cost", (req) => ({ key: req.params.barcode })),
     create: handle("create", body, 201),
-    update: handle("update", (req) => ({ id: req.params.id, input: req.body })),
+    update: handle("update", (req) => ({ id: req.params.id, input: { ...req.body, employee_id: req.user.user_id } })),
     importStock: handle("importStock", body),
     adjust: handle("adjust", body),
     exportStock: handle("exportStock", body),

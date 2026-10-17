@@ -108,7 +108,7 @@ function createOrderCheckoutService(repository, read) {
             deliveryMethod === "delivery" ? shippingAddress : null,
           note,
         });
-        await tx.insertItemsAndReduceStock(orderId, items);
+        await tx.insertItemsAndReduceStock(orderId, items, Number(actor.user_id || actor.id));
         const fakeQrContent =
           paymentMethod === "ewallet"
             ? `FAKE_QR_ORDER_${orderId}_${Math.round(finalAmount)}`
