@@ -59,10 +59,7 @@ async function findEmployee(employeeId) {
 }
 
 async function findActiveShift(connection, employeeId) {
-  const hasStatus = await workShiftHasStatus(connection);
-  const activeWhere = hasStatus
-    ? "end_time IS NULL AND status IN ('active', 'working', 'open')"
-    : 'end_time IS NULL';
+  const activeWhere = "end_time IS NULL AND status IN ('active', 'working', 'open')";
   const [rows] = await connection.execute(
     `SELECT *
      FROM work_shifts
@@ -75,16 +72,6 @@ async function findActiveShift(connection, employeeId) {
   return rows[0] || null;
 }
 
-async function workShiftHasStatus(connection) {
-  const [rows] = await connection.execute(
-    `SELECT COUNT(*) AS count
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = 'work_shifts'
-       AND COLUMN_NAME = 'status'`
-  );
-  return Number(rows[0]?.count || 0) > 0;
-}
 
 router.get('/', requireAuth, requireRoles('admin'), async (req, res) => {
   try {
@@ -209,7 +196,6 @@ router.post('/start', requireAuth, requireRoles('employee', 'admin'), async (req
     }
 
     await connection.beginTransaction();
-    const hasStatus = await workShiftHasStatus(connection);
     const activeShift = await findActiveShift(connection, employeeId);
     if (activeShift) {
       await connection.rollback();
@@ -220,15 +206,9 @@ router.post('/start', requireAuth, requireRoles('employee', 'admin'), async (req
       });
     }
 
-    const [result] = hasStatus
-      ? await connection.execute(
+    const [result] = await connection.execute(
           `INSERT INTO work_shifts (employee_id, shift_date, start_time, end_time, status)
            VALUES (?, CURDATE(), CURTIME(), NULL, 'working')`,
-          [employeeId]
-        )
-      : await connection.execute(
-          `INSERT INTO work_shifts (employee_id, shift_date, start_time, end_time)
-           VALUES (?, CURDATE(), CURTIME(), NULL)`,
           [employeeId]
         );
     const [rows] = await connection.execute('SELECT * FROM work_shifts WHERE shift_id = ?', [
@@ -262,28 +242,18 @@ router.post('/end', requireAuth, requireRoles('employee', 'admin'), async (req, 
     }
 
     await connection.beginTransaction();
-    const hasStatus = await workShiftHasStatus(connection);
     const activeShift = await findActiveShift(connection, employeeId);
     if (!activeShift) {
       await connection.rollback();
       return res.status(404).json({ success: false, message: 'Nhân viên chưa có ca đang làm' });
     }
 
-    if (hasStatus) {
       await connection.execute(
         `UPDATE work_shifts
          SET end_time = CURTIME(), status = 'completed'
          WHERE shift_id = ?`,
         [activeShift.shift_id]
       );
-    } else {
-      await connection.execute(
-        `UPDATE work_shifts
-         SET end_time = CURTIME()
-         WHERE shift_id = ?`,
-        [activeShift.shift_id]
-      );
-    }
     const [rows] = await connection.execute('SELECT * FROM work_shifts WHERE shift_id = ?', [
       activeShift.shift_id,
     ]);

@@ -5,7 +5,6 @@ const { requireAuth } = require('../middlewares/auth.middleware');
 const {
   hashPassword,
   verifyPassword,
-  isBcryptHash,
   signResetToken,
   verifyResetToken,
   normalizeEmail,
@@ -65,17 +64,6 @@ function toUser(row) {
   };
 }
 
-async function columnExists(tableName, columnName) {
-  const [rows] = await pool.execute(
-    `SELECT COUNT(*) AS count
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = ?
-       AND COLUMN_NAME = ?`,
-    [tableName, columnName]
-  );
-  return Number(rows[0]?.count || 0) > 0;
-}
 
 async function findRoleId(roleName) {
   const [roles] = await pool.execute(
@@ -106,35 +94,12 @@ async function findActiveUserByIdentifier(identifier, onlyCustomer = false) {
 }
 
 async function updatePasswordHash(userId, passwordHash) {
-  const hasPasswordHash = await columnExists('users', 'password_hash');
-  if (hasPasswordHash) {
-    await pool.execute(
-      'UPDATE users SET password = ?, password_hash = ? WHERE user_id = ?',
-      [passwordHash, passwordHash, userId]
-    );
-    return;
-  }
-  await pool.execute('UPDATE users SET password = ? WHERE user_id = ?', [
-    passwordHash,
-    userId,
-  ]);
+  await pool.execute('UPDATE users SET password_hash = ? WHERE user_id = ?', [passwordHash, userId]);
 }
 
 async function insertUser({ fullName, email, phone, passwordHash, address, roleId }) {
-  const hasPasswordHash = await columnExists('users', 'password_hash');
-  if (hasPasswordHash) {
-    return pool.execute(
-      `INSERT INTO users
-       (full_name, email, phone, password, password_hash, address, role_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [fullName, email, phone || null, passwordHash, passwordHash, address || null, roleId]
-    );
-  }
-
   return pool.execute(
-    `INSERT INTO users
-     (full_name, email, phone, password, address, role_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    'INSERT INTO users (full_name, email, phone, password_hash, address, role_id) VALUES (?, ?, ?, ?, ?, ?)',
     [fullName, email, phone || null, passwordHash, address || null, roleId]
   );
 }
@@ -232,7 +197,7 @@ router.post('/login', ...limits.login, async (req, res) => {
     }
 
     const user = await findActiveUserByIdentifier(identifier);
-    const storedPassword = user?.password_hash || user?.password;
+    const storedPassword = user?.password_hash;
     const passwordOk = user ? await verifyPassword(password, storedPassword) : false;
 
     if (!user || !passwordOk) {
@@ -242,12 +207,6 @@ router.post('/login', ...limits.login, async (req, res) => {
       });
     }
 
-    if (!isBcryptHash(storedPassword)) {
-      const upgraded = await hashPassword(password);
-      await updatePasswordHash(user.user_id, upgraded);
-      user.password = upgraded;
-      user.password_hash = upgraded;
-    }
 
     const safeUser = toUser(user);
     const pair = await createSession(user);

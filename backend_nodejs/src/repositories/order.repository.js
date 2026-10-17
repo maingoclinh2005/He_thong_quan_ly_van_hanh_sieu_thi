@@ -13,11 +13,10 @@ const orderSelect = `SELECT o.*, cu.full_name AS customer_name, eu.full_name AS 
   FROM orders o
   LEFT JOIN users cu ON cu.user_id = o.customer_id
   LEFT JOIN users eu ON eu.user_id = o.employee_id ${paymentJoinSql}`;
-const optionalOrderColumns = new Set([
+const additionalOrderColumns = new Set([
   "shift_id",
   "delivery_method",
   "payment_method",
-  "order_status",
   "points_used",
   "points_earned",
   "points_discount",
@@ -37,22 +36,12 @@ const orderInsertColumns = new Set([
   "payment_status",
   "shipping_address",
   "note",
-  ...optionalOrderColumns,
+  ...additionalOrderColumns,
 ]);
 
 function createOrderRepository(pool, executor = pool) {
   const rows = async (sql, params = []) =>
     (await executor.execute(sql, params))[0];
-  const columns = async (table) =>
-    new Set(
-      (
-        await rows(
-          `SELECT COLUMN_NAME FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
-          [table],
-        )
-      ).map((row) => row.COLUMN_NAME),
-    );
 
   return {
     transaction(work) {
@@ -94,14 +83,9 @@ function createOrderRepository(pool, executor = pool) {
       );
     },
     async listOnline({ includeHistory = false } = {}) {
-      const fields = await columns("orders");
-      const statuses =
-        "('pending', 'waiting_confirm', 'confirmed', 'shipping', 'completed', 'rejected', 'cancelled')";
       const statusWhere = includeHistory
-        ? `COALESCE(${fields.has("order_status") ? "o.order_status, " : ""}o.status, 'pending') IN ${statuses}`
-        : fields.has("order_status")
-          ? "(o.order_status IN ('pending', 'waiting_confirm', 'confirmed', 'shipping') OR o.status IN ('pending', 'confirmed', 'preparing'))"
-          : "o.status IN ('pending', 'confirmed', 'preparing')";
+        ? "o.status IN ('pending', 'confirmed', 'shipping', 'completed', 'rejected')"
+        : "o.status IN ('pending', 'confirmed', 'shipping')";
       return rows(`${orderSelect} WHERE o.order_type IN ('online', 'store_pickup', 'delivery')
         AND ${statusWhere} ORDER BY o.created_at DESC, o.order_id DESC`);
     },
@@ -114,15 +98,13 @@ function createOrderRepository(pool, executor = pool) {
       );
     },
     async findIdByCode(code, id) {
-      const fields = await columns("orders");
-      const hasContent = fields.has("transfer_content");
       return (
         (
           await rows(
             `SELECT order_id FROM orders
-        WHERE ${hasContent ? "(UPPER(transfer_content) = ? OR order_id = ?)" : "order_id = ?"}
+        WHERE (UPPER(transfer_content) = ? OR order_id = ?)
         ORDER BY created_at DESC, order_id DESC LIMIT 1`,
-            hasContent ? [code, id] : [id],
+            [code, id],
           )
         )[0]?.order_id || null
       );
@@ -168,14 +150,9 @@ function createOrderRepository(pool, executor = pool) {
         onlyMissingConfirmation = false,
       },
     ) {
-      const fields = await columns("orders");
       const setters = ["status = ?"];
       const params = [status];
-      if (fields.has("order_status")) {
-        setters.push("order_status = ?");
-        params.push(status);
-      }
-      if (confirmation && fields.has("confirmed_by")) {
+      if (confirmation) {
         setters.push(
           onlyMissingConfirmation
             ? "confirmed_by = COALESCE(confirmed_by, ?)"
@@ -183,24 +160,19 @@ function createOrderRepository(pool, executor = pool) {
         );
         params.push(employeeId || null);
       }
-      if (confirmation && fields.has("confirmed_at"))
+      if (confirmation)
         setters.push(
           onlyMissingConfirmation
             ? "confirmed_at = COALESCE(confirmed_at, NOW())"
             : "confirmed_at = NOW()",
         );
-      if (assignEmployee && fields.has("employee_id")) {
+      if (assignEmployee) {
         setters.push("employee_id = COALESCE(employee_id, ?)");
         params.push(employeeId || null);
       }
-      if (clearReason && fields.has("rejection_reason"))
-        setters.push("rejection_reason = NULL");
+      if (clearReason) setters.push("rejection_reason = NULL");
       if (reason !== undefined) {
-        const field = fields.has("rejection_reason")
-          ? "rejection_reason"
-          : fields.has("note")
-            ? "note"
-            : null;
+        const field = "rejection_reason";
         if (field) {
           setters.push(`${field} = ?`);
           params.push(reason || null);
@@ -214,12 +186,10 @@ function createOrderRepository(pool, executor = pool) {
       return result.affectedRows;
     },
     async activeShiftId(employeeId) {
-      const orderFields = await columns("orders");
-      if (!orderFields.has("shift_id") || !employeeId) return null;
-      const shiftFields = await columns("work_shifts");
+      if (!employeeId) return null;
       const result = await rows(
         `SELECT shift_id FROM work_shifts WHERE employee_id = ?
-        AND end_time IS NULL ${shiftFields.has("status") ? "AND status IN ('active', 'working')" : ""}
+        AND end_time IS NULL AND status IN ('active', 'working')
         ORDER BY shift_date DESC, start_time DESC, shift_id DESC LIMIT 1`,
         [employeeId],
       );
@@ -276,11 +246,10 @@ function createOrderRepository(pool, executor = pool) {
         );
     },
     async insertOrder(values) {
-      const fields = await columns("orders");
       const keys = Object.keys(values).filter((key) => {
         if (!orderInsertColumns.has(key))
           throw new Error("Unsupported order column");
-        return !optionalOrderColumns.has(key) || fields.has(key);
+        return true;
       });
       const result = await rows(
         `INSERT INTO orders (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`,
@@ -289,11 +258,10 @@ function createOrderRepository(pool, executor = pool) {
       return result.insertId;
     },
     async setTransferContent(id, content) {
-      if ((await columns("orders")).has("transfer_content"))
-        await rows(
-          "UPDATE orders SET transfer_content = ? WHERE order_id = ?",
-          [content, id],
-        );
+      await rows("UPDATE orders SET transfer_content = ? WHERE order_id = ?", [
+        content,
+        id,
+      ]);
     },
     async insertItemsAndReduceStock(orderId, items) {
       for (const item of items) {
@@ -307,8 +275,7 @@ function createOrderRepository(pool, executor = pool) {
         );
       }
     },
-    async insertPayment(values, { schemaAware = false } = {}) {
-      const fields = schemaAware ? await columns("payments") : null;
+    async insertPayment(values) {
       const allowed = new Set([
         "order_id",
         "method",
@@ -320,11 +287,7 @@ function createOrderRepository(pool, executor = pool) {
       ]);
       const keys = Object.keys(values).filter((key) => {
         if (!allowed.has(key)) throw new Error("Unsupported payment column");
-        return (
-          !schemaAware ||
-          !["transaction_id", "qr_content"].includes(key) ||
-          fields.has(key)
-        );
+        return true;
       });
       await rows(
         `INSERT INTO payments (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`,

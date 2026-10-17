@@ -14,7 +14,7 @@ async function loadUser(userId, sessionId) {
   const [users] = await pool.execute(
     `SELECT u.user_id, u.full_name, u.email, u.phone, u.address, u.points,
             u.membership_code, u.status, u.created_at, r.role_name,
-            u.password, u.password_hash, s.credential_hash
+            u.password_hash, s.credential_hash
      FROM users u
      JOIN roles r ON r.role_id = u.role_id
      JOIN auth_sessions s ON s.user_id = u.user_id
@@ -26,7 +26,6 @@ async function loadUser(userId, sessionId) {
   const user = users[0] || null;
   if (user) {
     if (credentialHash(user) !== user.credential_hash) return null;
-    delete user.password;
     delete user.password_hash;
     delete user.credential_hash;
     user.id = user.user_id;

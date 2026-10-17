@@ -68,7 +68,6 @@ test("dynamic identifiers are internal allowlists and values remain bound parame
       customer_id: 1,
       note: malicious,
       status: "pending",
-      order_status: "pending",
       shift_id: 7,
     }),
     9,
@@ -76,7 +75,7 @@ test("dynamic identifiers are internal allowlists and values remain bound parame
   const insert = pool.calls.find((c) => c.sql.startsWith("INSERT"));
   assert.ok(!insert.sql.includes(malicious));
   assert.ok(insert.params.includes(malicious));
-  assert.ok(!insert.sql.includes("shift_id"));
+  assert.ok(insert.sql.includes("shift_id"));
   await assert.rejects(
     repository.insertOrder({ bad_column: 1 }),
     /Unsupported order column/,
@@ -87,7 +86,7 @@ test("dynamic identifiers are internal allowlists and values remain bound parame
   );
 });
 
-test("schema-aware status updates preserve legacy fallbacks and confirmation behavior", async () => {
+test("canonical status updates write required columns without schema probes", async () => {
   const pool = mockPool(["note", "employee_id"]);
   await createOrderRepository(pool).updateStatus(9, {
     status: "rejected",
@@ -97,9 +96,9 @@ test("schema-aware status updates preserve legacy fallbacks and confirmation beh
     assignEmployee: true,
   });
   const update = pool.calls.find((c) => c.sql.startsWith("UPDATE"));
-  assert.match(update.sql, /note = \?/);
-  assert.doesNotMatch(update.sql, /order_status|confirmed_by/);
-  assert.deepEqual(update.params, ["rejected", 2, "Hết hàng", 9]);
+  assert.match(update.sql, /rejection_reason = \?/);
+  assert.doesNotMatch(update.sql, /order_status|information_schema/);
+  assert.deepEqual(update.params, ["rejected", 2, 2, "Hết hàng", 9]);
   const modern = mockPool(["order_status", "confirmed_by", "confirmed_at"]);
   await createOrderRepository(modern).updateStatus(9, {
     status: "confirmed",
@@ -113,7 +112,7 @@ test("schema-aware status updates preserve legacy fallbacks and confirmation beh
   );
 });
 
-test("repository transaction binds writes and schema reads to acquired connection", async () => {
+test("repository transaction binds writes to acquired connection", async () => {
   const tx = mockPool(["order_status"]);
   const connection = {
     ...tx,
@@ -142,22 +141,22 @@ test("repository transaction binds writes and schema reads to acquired connectio
     });
     await repository.clearCart(5);
   });
-  assert.equal(tx.calls.length, 6);
+  assert.equal(tx.calls.length, 5);
 });
 
-test("metadata read errors propagate without acquiring a leaked connection", async () => {
+test("query errors propagate without acquiring a leaked connection", async () => {
   let acquired = 0;
   const pool = {
     getConnection: async () => {
       acquired++;
     },
     execute: async () => {
-      throw new Error("metadata unavailable");
+      throw new Error("query unavailable");
     },
   };
   await assert.rejects(
     createOrderRepository(pool).listOnline(),
-    /metadata unavailable/,
+    /query unavailable/,
   );
   assert.equal(acquired, 0);
 });

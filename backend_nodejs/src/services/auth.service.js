@@ -25,7 +25,7 @@ async function verifyPassword(password, storedValue) {
   if (isBcryptHash(storedValue)) {
     return bcrypt.compare(password, storedValue);
   }
-  return password === storedValue;
+  return false;
 }
 
 function signResetToken(resetToken) {

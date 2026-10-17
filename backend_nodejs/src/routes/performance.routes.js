@@ -5,7 +5,7 @@ const { requireAuth, requireRoles } = require('../middlewares/auth.middleware');
 const router = express.Router();
 
 const paidOrderCondition =
-  "(o.payment_status IN ('paid', 'success') OR o.status IN ('completed', 'Hoàn thành', 'hoàn thành') OR o.order_status = 'completed')";
+  "(o.payment_status IN ('paid', 'success') OR o.status IN ('completed', 'Hoàn thành', 'hoàn thành'))";
 
 router.use(requireAuth, requireRoles('admin'));
 

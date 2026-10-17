@@ -127,7 +127,6 @@ function createOrderCreateService(repository, read, loyalty) {
                 ? new Date(paid_at)
                 : new Date()
               : null,
-          order_status: normalizedStatus,
           shipping_address: shipping_address || null,
           note: note || null,
         });
@@ -147,7 +146,6 @@ function createOrderCreateService(repository, read, loyalty) {
             qr_content: qr_content || content || null,
             paid_at: normalizedPayment === "paid" ? new Date() : null,
           },
-          { schemaAware: true },
         );
         if (
           ["paid", "success"].includes(

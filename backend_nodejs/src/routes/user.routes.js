@@ -74,17 +74,6 @@ function toShift(row) {
   };
 }
 
-async function columnExists(tableName, columnName) {
-  const [rows] = await pool.execute(
-    `SELECT COUNT(*) AS count
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = ?
-       AND COLUMN_NAME = ?`,
-    [tableName, columnName]
-  );
-  return Number(rows[0]?.count || 0) > 0;
-}
 
 function emptyEmployeeSummary(user) {
   return {
@@ -149,21 +138,12 @@ router.post('/', requireAuth, requireRoles('admin'), async (req, res) => {
     }
 
     const passwordHash = await hashPassword(password);
-    const hasPasswordHash = await columnExists('users', 'password_hash');
     let result;
-    if (hasPasswordHash) {
       [result] = await pool.execute(
-        `INSERT INTO users (full_name, email, phone, password, password_hash, address, role_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [name, email, phone || null, passwordHash, passwordHash, address || null, roles[0].role_id]
-      );
-    } else {
-      [result] = await pool.execute(
-        `INSERT INTO users (full_name, email, phone, password, address, role_id)
+        `INSERT INTO users (full_name, email, phone, password_hash, address, role_id)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [name, email, phone || null, passwordHash, address || null, roles[0].role_id]
       );
-    }
     const [rows] = await pool.execute(
       `SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id WHERE u.user_id = ?`,
       [result.insertId]
@@ -188,11 +168,7 @@ router.get('/:id/employee-summary', requireAuth, requireSelfOrRoles('admin'), as
       return res.status(404).json({ success: false, message: 'Không tìm thấy nhân viên' });
     }
 
-    const hasShiftStatus = await columnExists('work_shifts', 'status');
-    const hasOrdersShiftId = await columnExists('orders', 'shift_id');
-    const currentShiftWhere = hasShiftStatus
-      ? "end_time IS NULL AND status IN ('active', 'working', 'open')"
-      : 'end_time IS NULL';
+    const currentShiftWhere = "end_time IS NULL AND status IN ('active', 'working', 'open')";
 
     let currentShift = null;
     let latestShift = null;
@@ -224,7 +200,7 @@ router.get('/:id/employee-summary', requireAuth, requireSelfOrRoles('admin'), as
     const statsShift = currentShift || latestShift;
     const statsParams = [req.params.id];
     let statsWhere = 'o.employee_id = ?';
-    if (statsShift && hasOrdersShiftId) {
+    if (statsShift) {
       statsWhere += ' AND o.shift_id = ?';
       statsParams.push(statsShift.shift_id);
     }
@@ -247,9 +223,9 @@ router.get('/:id/employee-summary', requireAuth, requireSelfOrRoles('admin'), as
       statsParams
     );
 
-    let summaryScope = statsShift && hasOrdersShiftId ? 'shift' : 'employee_total';
+    let summaryScope = statsShift ? 'shift' : 'employee_total';
     let summary = summaryRows[0] || {};
-    if (statsShift && hasOrdersShiftId && toNumber(summary.total_orders) === 0) {
+    if (statsShift && toNumber(summary.total_orders) === 0) {
       [summaryRows] = await pool.execute(
         `SELECT
            COUNT(DISTINCT o.order_id) AS total_orders,
@@ -273,13 +249,13 @@ router.get('/:id/employee-summary', requireAuth, requireSelfOrRoles('admin'), as
 
     const historyParams = [req.params.id];
     let historyWhere = 'o.employee_id = ?';
-    if (statsShift && hasOrdersShiftId && summaryScope === 'shift') {
+    if (statsShift && summaryScope === 'shift') {
       historyWhere += ' AND o.shift_id = ?';
       historyParams.push(statsShift.shift_id);
     }
 
     const [payments] = await pool.execute(
-      `SELECT o.order_id, ${hasOrdersShiftId ? 'o.shift_id' : 'NULL AS shift_id'}, o.total_amount, o.final_amount, o.payment_status,
+      `SELECT o.order_id, o.shift_id, o.total_amount, o.final_amount, o.payment_status,
               p.method, p.amount, p.status, p.paid_at
        FROM orders o
        JOIN payments p ON p.order_id = o.order_id
@@ -347,29 +323,15 @@ router.put('/:id/profile', requireAuth, requireSelfOrRoles('admin'), async (req,
     }
 
     const passwordHash = password ? await hashPassword(password) : null;
-    const hasPasswordHash = await columnExists('users', 'password_hash');
-    if (hasPasswordHash) {
       await pool.execute(
         `UPDATE users
          SET full_name = COALESCE(?, full_name),
              phone = ?,
-             password = COALESCE(?, password),
              password_hash = COALESCE(?, password_hash),
-             address = ?
-         WHERE user_id = ?`,
-        [name, phone ?? null, passwordHash, passwordHash, address ?? null, req.params.id]
-      );
-    } else {
-      await pool.execute(
-        `UPDATE users
-         SET full_name = COALESCE(?, full_name),
-             phone = ?,
-             password = COALESCE(?, password),
              address = ?
          WHERE user_id = ?`,
         [name, phone ?? null, passwordHash, address ?? null, req.params.id]
       );
-    }
 
     const [rows] = await pool.execute(
       `SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id WHERE u.user_id = ?`,
@@ -398,14 +360,11 @@ router.put('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
     }
 
     const passwordHash = password ? await hashPassword(password) : null;
-    const hasPasswordHash = await columnExists('users', 'password_hash');
-    if (hasPasswordHash) {
       await pool.execute(
         `UPDATE users
          SET full_name = COALESCE(?, full_name),
              email = COALESCE(?, email),
              phone = ?,
-             password = COALESCE(?, password),
              password_hash = COALESCE(?, password_hash),
              address = ?,
              role_id = COALESCE(?, role_id),
@@ -416,36 +375,12 @@ router.put('/:id', requireAuth, requireRoles('admin'), async (req, res) => {
           email || null,
           phone ?? null,
           passwordHash,
-          passwordHash,
           address ?? null,
           roleId,
           status || null,
           req.params.id,
         ]
       );
-    } else {
-      await pool.execute(
-        `UPDATE users
-         SET full_name = COALESCE(?, full_name),
-             email = COALESCE(?, email),
-             phone = ?,
-             password = COALESCE(?, password),
-             address = ?,
-             role_id = COALESCE(?, role_id),
-             status = COALESCE(?, status)
-         WHERE user_id = ?`,
-        [
-          full_name || fullName || null,
-          email || null,
-          phone ?? null,
-          passwordHash,
-          address ?? null,
-          roleId,
-          status || null,
-          req.params.id,
-        ]
-      );
-    }
 
     const [rows] = await pool.execute(
       `SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id WHERE u.user_id = ?`,

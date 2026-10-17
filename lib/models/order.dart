@@ -184,7 +184,6 @@ class Order extends HiveObject {
       'order_type': orderType,
       'delivery_method': deliveryMethod,
       'status': status,
-      'order_status': status,
       'payment_status': paymentStatus ?? 'paid',
       'shipping_address': shippingAddress,
       'payment_method': paymentMethod ?? 'cash',
