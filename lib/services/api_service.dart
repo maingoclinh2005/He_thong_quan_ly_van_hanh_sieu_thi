@@ -899,9 +899,10 @@ class ApiService {
     _decode(response);
   }
 
-  static Future<void> exportInventory({
+  static Future<Product> exportInventory({
     required String inventoryItemId,
     String? productId,
+    required String requestKey,
     required int employeeId,
     required int quantity,
     String? note,
@@ -913,13 +914,14 @@ class ApiService {
           body: jsonEncode({
             'inventory_item_id': inventoryItemId,
             'product_id': productId == null ? null : int.tryParse(productId),
+            'request_key': requestKey,
             'employee_id': employeeId,
             'quantity': quantity,
             'note': note,
           }),
         )
         .timeout(_timeout);
-    _decode(response);
+    return Product.fromJson(_dataMap(_decode(response)));
   }
 
   static Future<Map<String, int>> fetchCart(int userId) async {

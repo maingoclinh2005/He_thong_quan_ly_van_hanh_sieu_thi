@@ -29,7 +29,7 @@ function fixture(overrides = {}) {
     lockItem: async () => row,
     importStock: async () => {},
     adjustStock: async () => {},
-    exportStock: async () => {},
+    exportStock: async (id, amount) => { if (amount > 10) throw new Error("Không đủ tồn kho"); return { product_id: 4 }; },
     logImport: async () => {},
     logAdjustment: async () => {},
     logExport: async () => {},
@@ -110,6 +110,7 @@ test("create/update map both naming conventions and preserve omitted-image behav
   assert.deepEqual(calls[0], [
     "create",
     {
+      actorId: undefined,
       barcode: "ABC",
       name: "Táo",
       price: 100,
@@ -169,7 +170,7 @@ test("import locks first and atomically updates stock/cost and log", async () =>
     calls.map((c) => c[0]),
     ["begin", "lockItem", "importStock", "logImport", "commit"],
   );
-  assert.deepEqual(calls[2], ["importStock", 7, 3, 50]);
+  assert.deepEqual(calls[2], ["importStock", 7, 3, 50, 2]);
   assert.deepEqual(calls[3][1], {
     itemId: 7,
     employeeId: 2,
@@ -197,20 +198,12 @@ test("adjustment records signed difference, including zero actual stock", async 
   }
 });
 
-test("export reduces inventory only, records negative quantity and optional product", async () => {
+test("export returns product after atomic repository transfer, without a second log write", async () => {
   const { service, calls } = fixture();
-  await service.exportStock({ input: { ...input, product_id: 4 } });
-  assert.deepEqual(
-    calls.map((c) => c[0]),
-    ["begin", "lockItem", "exportStock", "logExport", "commit"],
-  );
-  assert.deepEqual(calls[3][1], {
-    itemId: 7,
-    productId: 4,
-    employeeId: 2,
-    quantity: -3,
-    note: "Đưa hàng lên kệ",
-  });
+  const result = await service.exportStock({ input: { ...input, product_id: 4 } });
+  assert.equal(result.data.product_id, 4);
+  assert.deepEqual(calls.map(c => c[0]), ["begin", "lockItem", "exportStock", "commit"]);
+  assert.deepEqual(calls[2], ["exportStock", 7, 3, 4, 2, undefined]);
 });
 
 test("validation before transaction; missing item, insufficient stock and log failures roll back", async () => {
@@ -241,12 +234,12 @@ test("validation before transaction; missing item, insufficient stock and log fa
   );
   assert.deepEqual(
     stock.calls.map((c) => c[0]),
-    ["begin", "lockItem", "rollback"],
+    ["begin", "lockItem", "exportStock", "rollback"],
   );
   for (const [action, log] of [
     ["importStock", "logImport"],
     ["adjust", "logAdjustment"],
-    ["exportStock", "logExport"],
+    ["exportStock", "exportStock"],
   ]) {
     const { service, calls } = fixture({
       [log]: async () => {
@@ -267,6 +260,7 @@ test("repository uses bound parameters and the same SQL connection throughout mo
   const connection = {
     execute: async (sql, params) => {
       calls.push({ sql, params });
+      if (sql.startsWith("SELECT * FROM inventory_items")) return [[{ inventory_item_id: 7, stock: 0 }]];
       return [[]];
     },
     beginTransaction: async () => calls.push("begin"),
@@ -297,7 +291,8 @@ test("repository uses bound parameters and the same SQL connection throughout mo
   assert.equal(calls.at(-2), "commit");
   assert.equal(calls.at(-1), "release");
   assert.match(calls[1].sql, /FOR UPDATE/);
-  assert.deepEqual(calls[1].params, [hostile, hostile]);
-  assert.ok(!calls[3].sql.includes(hostile));
-  assert.equal(calls[3].params.at(-1), hostile);
+  assert.deepEqual(calls[1].params, [hostile, hostile, hostile]);
+  const log = calls.find(c => c.sql?.startsWith("INSERT INTO inventory_logs"));
+  assert.ok(!log.sql.includes(hostile));
+  assert.equal(log.params.at(-1), hostile);
 });

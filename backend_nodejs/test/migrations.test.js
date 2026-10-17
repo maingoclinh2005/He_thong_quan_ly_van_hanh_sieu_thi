@@ -117,9 +117,9 @@ test("version catalog, checksum drift, unknown versions, gaps and dirty directio
   const migrations = await loadMigrations();
   assert.deepEqual(
     migrations.map((m) => m.version),
-    ["0001", "0002"],
+    ["0001", "0002", "0003"],
   );
-  assert.equal(plan(migrations, [], "up").length, 2);
+  assert.equal(plan(migrations, [], "up").length, 3);
   const row = { ...migrations[0], state: "applied", direction: "up" };
   assert.throws(
     () => plan(migrations, [{ ...row, checksum: "changed" }], "up"),
@@ -149,7 +149,7 @@ test("version catalog, checksum drift, unknown versions, gaps and dirty directio
 
 test("up is logged and repeat-safe; down restores current data including new rows; re-up works", async () => {
   const db = fakeDatabase();
-  const migrations = await loadMigrations();
+  const migrations = (await loadMigrations()).filter(m => m.version <= "0002");
   db.users.push({ user_id: 1, password: "old-plaintext", password_hash: null });
   db.orders.push({
     order_id: 1,
@@ -165,7 +165,7 @@ test("up is logged and repeat-safe; down restores current data including new row
   assert.equal("order_status" in db.orders[0], false);
   assert.equal(db.orders[0].status, "pending");
   assert.equal(db.lock, null);
-  await assertSchemaVersion(db);
+  await assert.rejects(assertSchemaVersion(db), /migration required/);
   const events = db.events.length;
   await run(db, migrations, options);
   assert.equal(db.events.length, events);
@@ -214,7 +214,7 @@ test("conflicting states/credentials and missing baseline stop before business w
 
 test("DDL interruption is recorded; no blind retry, explicit same-direction resume succeeds", async () => {
   const db = fakeDatabase();
-  const migrations = await loadMigrations();
+  const migrations = (await loadMigrations()).filter(m => m.version <= "0002");
   const query = db.query.bind(db);
   let fail = true;
   db.query = async (sql) => {

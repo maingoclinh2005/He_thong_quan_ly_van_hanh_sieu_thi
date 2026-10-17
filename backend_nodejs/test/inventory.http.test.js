@@ -119,6 +119,7 @@ test("all inventory routes preserve role guards, adapters, status and masked err
         assert.equal((await response.json()).data, action);
         if (action === "update") assert.equal(calls.at(-1).input.id, "ABC");
         if (action === "cost") assert.equal(calls.at(-1).input.key, "ABC");
+        if (method !== "GET") assert.equal(calls.at(-1).input.input.employee_id, id);
       } else assert.equal(calls.length, previous);
     }
   }

@@ -34,6 +34,7 @@ function fixture(overrides = {}, loyaltyOverrides = {}) {
     listForCustomer: async () => [saved],
     findCustomerItems: async () => [],
     lockOrder: async () => saved,
+    reverseStock: async () => {},
     updateStatus: async (id, change) => {
       saved = { ...saved, status: change.status };
       return 1;
@@ -283,7 +284,7 @@ test("invalid transitions rollback without update; repeated confirmation is reje
     "invalid",
   );
   await rejectsKind(
-    fixture({ updateStatus: async () => 0 }).service.updateStatus({
+    fixture({ lockOrder: async () => null }).service.updateStatus({
       id: 9,
       status: "completed",
       actor: employee,
@@ -431,4 +432,13 @@ test("loyalty redemption and award use the same transaction; failures prevent co
     service.create({ input: { items: [] }, actor: employee }),
     "invalid",
   );
+});
+
+test("reject restores stock before status update; repeated terminal update is a no-op", async () => {
+  const { service, calls } = fixture();
+  await service.updateStatus({id:9,status:"rejected",actor:employee});
+  await service.updateStatus({id:9,status:"rejected",actor:employee});
+  assert.equal(calls.filter(c=>c[0]==="reverseStock").length,1);
+  assert.ok(calls.findIndex(c=>c[0]==="reverseStock") < calls.findIndex(c=>c[0]==="updateStatus"));
+  await assert.rejects(service.updateStatus({id:9,status:"pending",actor:employee}), /mở lại/);
 });

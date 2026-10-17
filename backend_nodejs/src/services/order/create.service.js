@@ -135,7 +135,7 @@ function createOrderCreateService(repository, read, loyalty) {
             ? transfer_content || `DH${id}`
             : transfer_content || null;
         if (content) await tx.setTransferContent(id, content);
-        await tx.insertItemsAndReduceStock(id, normalizedItems);
+        await tx.insertItemsAndReduceStock(id, normalizedItems, Number(actor.user_id || actor.id));
         await tx.insertPayment(
           {
             order_id: id,
