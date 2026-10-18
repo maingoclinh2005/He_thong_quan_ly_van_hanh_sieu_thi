@@ -1,13 +1,14 @@
-const REQUIRED_VERSION = "0003";
+const REQUIRED_VERSION = "0004";
 async function assertSchemaVersion(db) {
   const [rows] = await db.execute(
     "SELECT version, state FROM schema_migrations ORDER BY version",
   );
   if (
-    rows.length !== 3 ||
+    rows.length !== 4 ||
     rows[0].version !== "0001" ||
     rows[1].version !== "0002" ||
-    rows[2].version !== REQUIRED_VERSION ||
+    rows[2].version !== "0003" ||
+    rows[3].version !== REQUIRED_VERSION ||
     rows.some((row) => row.state !== "applied")
   ) {
     throw new Error(

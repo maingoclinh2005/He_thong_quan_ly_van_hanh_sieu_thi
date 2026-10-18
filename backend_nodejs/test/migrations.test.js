@@ -117,9 +117,9 @@ test("version catalog, checksum drift, unknown versions, gaps and dirty directio
   const migrations = await loadMigrations();
   assert.deepEqual(
     migrations.map((m) => m.version),
-    ["0001", "0002", "0003"],
+    ["0001", "0002", "0003", "0004"],
   );
-  assert.equal(plan(migrations, [], "up").length, 3);
+  assert.equal(plan(migrations, [], "up").length, 4);
   const row = { ...migrations[0], state: "applied", direction: "up" };
   assert.throws(
     () => plan(migrations, [{ ...row, checksum: "changed" }], "up"),

@@ -5,9 +5,11 @@
 - `users.password_hash` là nguồn mật khẩu duy nhất. Không còn đọc/ghi `users.password`; đăng nhập không chấp nhận plaintext.
 - `orders.status` là trạng thái đơn duy nhất: pending, confirmed, shipping, completed, rejected. `payment_status` vẫn riêng vì trạng thái thanh toán khác trạng thái giao hàng.
 - `order_status` đầu vào cũ còn được chuyển đổi ở adapter nghiệp vụ; không lưu hai cột. Flutter đã bỏ field trùng khỏi payload tạo đơn.
-- API không truy vấn information_schema hay bỏ qua cột thiếu. Backend chỉ mở cổng nếu ledger có 0001, 0002 và 0003 ở trạng thái applied. Không tự chạy DDL lúc khởi động.
+- API không truy vấn information_schema hay bỏ qua cột thiếu. Backend chỉ mở cổng nếu ledger có 0001, 0002, 0003 và 0004 ở trạng thái applied. Không tự chạy DDL lúc khởi động.
 
 Xem [inventory-ledger.md](inventory-ledger.md) cho nguồn tồn kho chuẩn, rollout Flutter và giới hạn rollback 0003.
+
+Xem [query-indexes.md](query-indexes.md) cho index 0004, rollback và kiểm tra EXPLAIN.
 
 ## Các phiên bản
 
@@ -15,6 +17,8 @@ Xem [inventory-ledger.md](inventory-ledger.md) cho nguồn tồn kho chuẩn, ro
 - **0002_canonical_columns**: preflight toàn bộ người dùng/đơn hàng trước khi ghi; chuyển mật khẩu cũ sang bcrypt khi cần; chuẩn hóa trạng thái; bỏ hai cột cũ. Nếu hai nguồn mâu thuẫn hoặc trạng thái lạ, dừng và yêu cầu người triển khai đối soát. Không tự chọn trạng thái hoàn thành thay cho chờ xác nhận.
 
 - **0003_inventory_ledger**: nguồn tồn kho chung với hai vị trí kho/kệ, số dư đầu kỳ và sale cho đơn đang xử lý; bổ sung FK category. Down lưu trữ ledger, không xóa lịch sử.
+
+- **0004_query_indexes**: thêm bốn composite index cho orders, inventory_logs, products, payments; bỏ qua index tương đương và down chỉ gỡ index do migration tạo.
 
 `database/migrations/*.sql` là lịch sử bootstrap trước khi có ledger, không nằm trong hàng đợi versioned. Cài đặt cũ thiếu schema phải hoàn tất các bước legacy còn thiếu trên staging trước khi nhận baseline. Database mới: bootstrap bằng schema hiện có và migration auth sessions, sau đó kiểm tra baseline; đây chưa phải công cụ tạo database rỗng một lệnh. Không chạy `database_reset.sql` lên dữ liệu thật.
 
@@ -56,7 +60,7 @@ Dừng writer, backup mới, rồi:
 
 `npm run migrate:down -- --maintenance --backup-confirmed`
 
-Chỉ rollback phiên bản applied cao nhất (hiện là 0003); baseline không có down phá dữ liệu. Sau down, deploy lại mã nguồn trước đợt này. Backend mới từ chối khởi động khi bất kỳ phiên bản bắt buộc nào rolled_back.
+Chỉ rollback phiên bản applied cao nhất (hiện là 0004); baseline không có down phá dữ liệu. Sau down, deploy lại mã nguồn trước đợt này. Backend mới từ chối khởi động khi bất kỳ phiên bản bắt buộc nào rolled_back.
 
 Riêng down 0002 tái tạo `users.password` từ hash hiện tại và `orders.order_status` từ status hiện tại, bao gồm tài khoản/đơn tạo sau up. Không ghi đè bằng snapshot cũ và không phục hồi plaintext. Đây là rollback tương thích ứng dụng, **không phải phục hồi chính xác mọi byte/giá trị legacy**; cột phục hồi cho phép NULL. Muốn khôi phục dữ liệu/DDL nguyên trạng phải dùng backup đã kiểm chứng.
 
