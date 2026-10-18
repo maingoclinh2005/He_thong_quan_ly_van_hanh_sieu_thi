@@ -47,7 +47,7 @@ test('0003 refuses re-up after archived rollback', async () => {
   const db=fake((sql,p)=>p[0]==='inventory_ledger_0003_archive'?[{}]:[]);
   await assert.rejects(migration.up(db,step), /archive exists/);
 });
-test('startup requires all three applied migrations', async () => {
-  await assertSchemaVersion({execute:async()=>[[...['0001','0002','0003'].map(version=>({version,state:'applied'}))]]});
+test('startup requires all four applied migrations', async () => {
+  await assertSchemaVersion({execute:async()=>[[...['0001','0002','0003','0004'].map(version=>({version,state:'applied'}))]]});
   await assert.rejects(assertSchemaVersion({execute:async()=>[[{version:'0001',state:'applied'},{version:'0002',state:'applied'}]]}));
 });
