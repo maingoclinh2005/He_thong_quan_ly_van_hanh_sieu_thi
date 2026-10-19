@@ -23,7 +23,8 @@ Duration get _shiftTimeout =>
 
 class ApiException implements Exception {
   final String message;
-  ApiException(this.message);
+  final int? statusCode;
+  ApiException(this.message, {this.statusCode});
 
   @override
   String toString() => message;
@@ -117,7 +118,7 @@ class ApiService {
       final message = body is Map && body['message'] != null
           ? body['message'].toString()
           : 'Lỗi API ${response.statusCode}';
-      throw ApiException(message);
+      throw ApiException(message, statusCode: response.statusCode);
     }
     if (body is Map && body['success'] == false) {
       throw ApiException((body['message'] ?? 'API trả về lỗi').toString());

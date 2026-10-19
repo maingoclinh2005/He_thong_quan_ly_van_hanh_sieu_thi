@@ -1,3 +1,4 @@
+import '../features/catalog/data/catalog_repository.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -136,20 +137,13 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
           price: price,
           importPrice: importPrice,
           unit: unit,
-          stockQuantity: existing.stockQuantity,
+          stockQuantity: qty,
           categoryId: _selectedCategoryId,
           imageUrl: existing.imageUrl,
         );
 
-        await ApiService.updateInventoryItem(updated);
-        await DBService.syncInventoryItemsFromApi();
-        if (qty != existing.stockQuantity) {
-          await DBService.adjustInventoryRemote(
-            item: updated,
-            actualQuantity: qty,
-            note: 'Cập nhật tồn kho',
-          );
-        }
+        await CatalogRepository.update(updated);
+        // Stock changes are ledger adjustments in the single update API.
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
