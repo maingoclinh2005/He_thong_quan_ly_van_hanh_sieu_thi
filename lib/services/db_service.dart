@@ -1,6 +1,9 @@
-import 'dart:math';
+import 'package:flutter/foundation.dart';
+import '../features/cart/data/cart_repository.dart';
+import '../features/checkout/data/checkout_repository.dart';
+import '../features/catalog/data/catalog_repository.dart';
+import '../features/catalog/data/store_cache_repository.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'dart:async';
 import '../models/product.dart';
 import '../models/inventory_item.dart';
 import '../models/user.dart';
@@ -9,7 +12,6 @@ import '../models/order_line.dart';
 import '../models/inventory_history_entry.dart';
 import 'api_service.dart';
 import 'token_store.dart';
-import '../utils/type_converters.dart';
 import '../utils/constants.dart';
 
 /// Helper class for seed data structure
@@ -71,7 +73,7 @@ class DBService {
     try {
       await _migrateProductsToIdKeys();
     } catch (e) {
-      print('Cache sản phẩm cũ không tương thích, xóa cache: $e');
+      debugPrint('Cache sản phẩm cũ không tương thích, xóa cache: $e');
       await _clearRuntimeCache();
     }
 
@@ -93,10 +95,12 @@ class DBService {
         await syncAllFromApi();
       }
     } catch (e) {
-      print('Không đồng bộ được API, dùng cache Hive: $e');
-      await seedProducts();
-      await seedInventory();
-      await seedUsers();
+      debugPrint('Không đồng bộ được API, dùng cache Hive: $e');
+      if (forceUseLocalProductSeed) {
+        await seedProducts();
+        await seedInventory();
+        await seedUsers();
+      }
     }
   }
 
@@ -153,14 +157,23 @@ class DBService {
   }
 
   static Future<void> _clearRuntimeCache() async {
+    // Auth migration can run before typed boxes are opened.
+    Future<void> clear(String name, Future<dynamic> Function() opened) async {
+      if (Hive.isBoxOpen(name)) {
+        await opened();
+      } else {
+        await Hive.deleteBoxFromDisk(name);
+      }
+    }
+
     await Future.wait([
-      products().clear(),
-      inventoryProducts().clear(),
-      users().clear(),
-      orders().clear(),
-      inventoryHistory().clear(),
-      productImages().clear(),
-      carts().clear(),
+      clear(productsBox, () => products().clear()),
+      clear(inventoryProductsBox, () => inventoryProducts().clear()),
+      clear(usersBox, () => users().clear()),
+      clear(ordersBox, () => orders().clear()),
+      clear(inventoryHistoryBox, () => inventoryHistory().clear()),
+      clear(productImagesBox, () => productImages().clear()),
+      clear(cartsBox, () => carts().clear()),
     ]);
   }
 
@@ -183,55 +196,12 @@ class DBService {
     ]);
   }
 
-  static Future<void> syncProductsFromApi() async {
-    final remoteProducts = await ApiService.fetchProducts();
-    final productBox = products();
-    final imageBox = productImages();
+  static Future<void> syncProductsFromApi() => StoreCacheRepository.products();
 
-    // Giữ cache hiện có nếu API trả rỗng để tránh Home bị trắng sản phẩm.
-    if (remoteProducts.isEmpty) {
-      if (productBox.isEmpty) {
-        await seedProducts();
-      }
-      return;
-    }
+  static Future<void> syncInventoryItemsFromApi() =>
+      StoreCacheRepository.inventory();
 
-    await productBox.clear();
-
-    for (final product in remoteProducts) {
-      await productBox.put(product.id, product);
-      if (product.imageUrl != null && product.imageUrl!.isNotEmpty) {
-        await imageBox.put(
-          product.id,
-          ApiService.resolveBackendUrl(product.imageUrl!),
-        );
-      }
-    }
-  }
-
-  static Future<void> syncInventoryItemsFromApi() async {
-    final remoteItems = await ApiService.fetchInventoryItems();
-    final box = inventoryProducts();
-    await box.clear();
-    for (final item in remoteItems) {
-      await box.put(item.id, item);
-      if (item.imageUrl != null && item.imageUrl!.isNotEmpty) {
-        await productImages().put(
-          item.id,
-          ApiService.resolveBackendUrl(item.imageUrl!),
-        );
-      }
-    }
-  }
-
-  static Future<void> syncUsersFromApi() async {
-    final remoteUsers = await ApiService.fetchUsers();
-    final box = users();
-    await box.clear();
-    for (final user in remoteUsers) {
-      await box.put(user.email, user);
-    }
-  }
+  static Future<void> syncUsersFromApi() => StoreCacheRepository.users();
 
   static Future<User> updateCurrentUserProfile({
     required User user,
@@ -255,48 +225,10 @@ class DBService {
     return saved;
   }
 
-  static Future<void> syncOrdersFromApi() async {
-    final remoteOrders = await ApiService.fetchOrders();
-    final detailedOrders = await Future.wait(
-      remoteOrders.map((order) async {
-        try {
-          return await ApiService.fetchOrderDetail(order.id);
-        } catch (_) {
-          return order;
-        }
-      }),
-    );
-    final box = orders();
-    await box.clear();
-    for (final order in detailedOrders) {
-      await box.put(order.id, order);
-    }
-  }
+  static Future<void> syncOrdersFromApi() => StoreCacheRepository.orders();
 
-  static Future<void> syncInventoryHistoryFromApi() async {
-    final logs = await ApiService.fetchInventoryLogs();
-    final box = inventoryHistory();
-    await box.clear();
-    for (final log in logs) {
-      await box.add(
-        InventoryHistoryEntry(
-          id: (log['log_id'] ?? '${DateTime.now().microsecondsSinceEpoch}')
-              .toString(),
-          type: (log['action'] ?? '').toString().toLowerCase(),
-          itemId: (log['inventory_item_id'] ?? log['product_id']).toString(),
-          itemName: (log['item_name'] ?? log['product_name'] ?? '').toString(),
-          unit: (log['unit'] ?? 'sp').toString(),
-          quantityChange: TypeConverters.toInt(log['quantity']),
-          beforeQuantity: 0,
-          afterQuantity: 0,
-          note: (log['note'] ?? '').toString(),
-          createdAt:
-              DateTime.tryParse((log['created_at'] ?? '').toString()) ??
-              DateTime.now(),
-        ),
-      );
-    }
-  }
+  static Future<void> syncInventoryHistoryFromApi() =>
+      StoreCacheRepository.history();
 
   static Future<void> addInventoryHistoryEntry(
     InventoryHistoryEntry entry,
@@ -446,7 +378,7 @@ class DBService {
           ),
         );
       }
-      print('--- ĐÃ TẠO ${_masterSeedData.length} SẢN PHẨM MẪU ---');
+      debugPrint('--- ĐÃ TẠO ${_masterSeedData.length} SẢN PHẨM MẪU ---');
     }
   }
 
@@ -474,7 +406,7 @@ class DBService {
           ),
         );
       }
-      print('--- ĐÃ TẠO ${_masterSeedData.length} MẶT HÀNG KHO MẪU ---');
+      debugPrint('--- ĐÃ TẠO ${_masterSeedData.length} MẶT HÀNG KHO MẪU ---');
     }
   }
 
@@ -508,66 +440,19 @@ class DBService {
 
   // --- LOGIC QUẢN LÝ KHO & BÁN HÀNG ---
 
-  static Future<void> saveOrder(Order order) async {
-    if (forceUseLocalProductSeed) {
-      // Chế độ local/dev: lưu đơn ngay để màn thanh toán phản hồi tức thì.
-      await orders().put(order.id, order);
-      return;
-    }
-
-    final employeeId = settings().get('current_user_id') as int?;
-    final saved = await ApiService.createOrder(
-      order,
-      customerId: order.customerId,
-      employeeId: employeeId,
-    );
-    await orders().put(saved.id, saved);
-    // Đồng bộ tồn kho chạy nền để UI thanh toán phản hồi nhanh hơn.
-    unawaited(
-      syncProductsFromApi().catchError((e) {
-        print('Đồng bộ sản phẩm sau thanh toán thất bại: $e');
-      }),
-    );
-  }
-
-  static Future<void> saveOrderWithVoucher(
+  static Future<Order> saveOrder(Order order) =>
+      CheckoutRepository.create(order);
+  static Future<Order> saveOrderWithVoucher(
     Order order, {
     int? voucherId,
     double discountAmount = 0,
     int? userId,
-  }) async {
-    if (forceUseLocalProductSeed) {
-      await orders().put(order.id, order);
-      return;
-    }
-
-    final rawCurrentUserId = settings().get('current_user_id');
-    final employeeId = rawCurrentUserId is int
-        ? rawCurrentUserId
-        : int.tryParse(rawCurrentUserId?.toString() ?? '');
-
-    // Lấy user_id: customer_id -> userId -> employeeId
-    // (Đảm bảo truyền xuống backend luôn là int để backend insert user_vouchers đúng)
-    final userIdToUse = order.customerId ?? userId ?? employeeId;
-
-    // Gọi API với thêm voucher info
-    final saved = await ApiService.createOrderWithVoucher(
-      order,
-      customerId: order.customerId,
-      employeeId: employeeId,
-      voucherId: voucherId,
-      discountAmount: discountAmount,
-      userId: userIdToUse,
-    );
-
-    await orders().put(saved.id, saved);
-    // Đồng bộ tồn kho chạy nền để UI thanh toán phản hồi nhanh hơn.
-    unawaited(
-      syncProductsFromApi().catchError((e) {
-        print('Đồng bộ sản phẩm sau thanh toán thất bại: $e');
-      }),
-    );
-  }
+  }) => CheckoutRepository.create(
+    order,
+    voucherId: voucherId,
+    discountAmount: discountAmount,
+    userId: userId,
+  );
 
   static List<Product> getAllProducts() {
     return products().values.toList();
@@ -597,35 +482,10 @@ class DBService {
     }
   }
 
-  static Future<void> saveCartForUser(
-    String email,
-    Map<String, int> cart,
-  ) async {
-    final Map<String, int> cleanCart = Map.from(cart)
-      ..removeWhere((key, value) => value <= 0);
-    await carts().put(email, cleanCart);
-    final userId = currentUserId();
-    if (userId != null) {
-      await ApiService.saveCart(userId, cleanCart);
-    }
-  }
-
-  static Future<Map<String, int>> loadCartForCurrentUser(String email) async {
-    final userId = currentUserId();
-    final localCart = getCartForUser(email);
-    if (userId == null) return localCart;
-    try {
-      final remoteCart = await ApiService.fetchCart(userId);
-      if (remoteCart.isEmpty && localCart.isNotEmpty) {
-        await ApiService.saveCart(userId, localCart);
-        return localCart;
-      }
-      await carts().put(email, remoteCart);
-      return remoteCart;
-    } catch (_) {
-      return localCart;
-    }
-  }
+  static Future<void> saveCartForUser(String email, Map<String, int> cart) =>
+      CartRepository.save(email, cart);
+  static Future<Map<String, int>> loadCartForCurrentUser(String email) =>
+      CartRepository.load(email);
 
   static String? currentUserEmail() {
     if (!TokenStore.instance.hasSession) return null;
@@ -642,6 +502,7 @@ class DBService {
 
   static Future<void> clearAuthSession() async {
     await TokenStore.instance.clear();
+    await StoreCacheRepository.coordinator.clear(_clearRuntimeCache);
     final box = settings();
     await Future.wait([
       box.delete('auth_token'),
@@ -653,29 +514,8 @@ class DBService {
     ]);
   }
 
-  static Future<Product> findSaleProductByCode(String code) async {
-    final normalized = code.trim();
-    if (normalized.isEmpty) {
-      throw ApiException('Vui lòng nhập mã vạch / mã nội bộ');
-    }
-
-    final result = await ApiService.scanProductCode(normalized);
-    final type = (result['type'] ?? '').toString();
-    final productMap = result['product'];
-    if (type != 'product' || productMap is! Map) {
-      throw ApiException('Không tìm thấy sản phẩm bán hàng');
-    }
-
-    final product = Product.fromJson(Map<String, dynamic>.from(productMap));
-    await products().put(product.id, product);
-    if (product.imageUrl != null && product.imageUrl!.isNotEmpty) {
-      await productImages().put(
-        product.id,
-        ApiService.resolveBackendUrl(product.imageUrl!),
-      );
-    }
-    return product;
-  }
+  static Future<Product> findSaleProductByCode(String code) =>
+      CatalogRepository.scan(code);
 
   static Future<Map<String, int>> addProductToCurrentCart(
     Product product,
@@ -699,91 +539,42 @@ class DBService {
     return cart;
   }
 
-  static Future<Product> createProduct(
-    Product product, {
-    String? imagePath,
-  }) async {
-    if (imagePath != null &&
-        imagePath.isNotEmpty &&
-        !imagePath.startsWith('http')) {
-      product.imageUrl = await ApiService.uploadProductImage(imagePath);
-    }
-    final saved = await ApiService.createProduct(product);
-    await products().put(saved.id, saved);
-    if (saved.imageUrl != null) {
-      await productImages().put(
-        saved.id,
-        ApiService.resolveBackendUrl(saved.imageUrl!),
+  static Future<Product> createProduct(Product product, {String? imagePath}) =>
+      CatalogRepository.saveProduct(
+        product,
+        create: true,
+        imagePath: imagePath,
       );
-    }
-    return saved;
-  }
 
   static Future<Product> updateProductRemote(
     Product product, {
     String? imagePath,
-  }) async {
-    if (imagePath != null &&
-        imagePath.isNotEmpty &&
-        !imagePath.startsWith('http')) {
-      product.imageUrl = await ApiService.uploadProductImage(imagePath);
-    }
-    final saved = await ApiService.updateProduct(product);
-    await products().put(saved.id, saved);
-    if (saved.imageUrl != null) {
-      await productImages().put(
-        saved.id,
-        ApiService.resolveBackendUrl(saved.imageUrl!),
-      );
-    }
-    return saved;
-  }
+  }) => CatalogRepository.saveProduct(product, imagePath: imagePath);
 
-  static Future<void> deleteProductRemote(Product product) async {
-    await ApiService.deleteProduct(product.id);
-    await products().delete(product.id);
-    await productImages().delete(product.id);
-  }
+  static Future<void> deleteProductRemote(Product product) =>
+      CatalogRepository.deleteProduct(product);
 
   static Future<void> importInventoryRemote({
     required InventoryItem item,
     required int quantity,
     required double importPrice,
     String? note,
-  }) async {
-    final employeeId = settings().get('current_user_id') as int?;
-    if (employeeId == null) {
-      throw ApiException('Chưa có current_user_id để ghi lịch sử nhập kho');
-    }
-    await ApiService.importInventory(
-      inventoryItemId: item.id,
-      employeeId: employeeId,
-      quantity: quantity,
-      importPrice: importPrice,
-      note: note,
-    );
-    await syncInventoryItemsFromApi();
-    await syncInventoryHistoryFromApi();
-  }
+  }) => CatalogRepository.importStock(
+    item: item,
+    quantity: quantity,
+    importPrice: importPrice,
+    note: note,
+  );
 
   static Future<void> adjustInventoryRemote({
     required InventoryItem item,
     required int actualQuantity,
     String? note,
-  }) async {
-    final employeeId = settings().get('current_user_id') as int?;
-    if (employeeId == null) {
-      throw ApiException('Chưa có current_user_id để ghi lịch sử kiểm kê');
-    }
-    await ApiService.adjustInventory(
-      inventoryItemId: item.id,
-      employeeId: employeeId,
-      actualQuantity: actualQuantity,
-      note: note,
-    );
-    await syncInventoryItemsFromApi();
-    await syncInventoryHistoryFromApi();
-  }
+  }) => CatalogRepository.adjust(
+    item: item,
+    actualQuantity: actualQuantity,
+    note: note,
+  );
 
   static Future<InventoryItem> createInventoryItemRemote({
     required String barcode,
@@ -794,45 +585,16 @@ class DBService {
     required int quantity,
     int? categoryId,
     String? imagePath,
-  }) async {
-    String? uploadedImageUrl;
-    if (imagePath != null &&
-        imagePath.isNotEmpty &&
-        !imagePath.startsWith('http')) {
-      uploadedImageUrl = await ApiService.uploadProductImage(imagePath);
-    } else if (imagePath != null && imagePath.isNotEmpty) {
-      uploadedImageUrl = ApiService.resolveBackendUrl(imagePath);
-    }
-
-    final item = InventoryItem(
-      name: name,
-      price: price,
-      importPrice: importPrice,
-      unit: unit,
-      id: barcode,
-      stockQuantity: 0,
-      categoryId: categoryId,
-      imageUrl: uploadedImageUrl,
-    );
-
-    final saved = await ApiService.createInventoryItem(item);
-    await inventoryProducts().put(saved.id, saved);
-    final savedImageUrl = saved.imageUrl ?? uploadedImageUrl;
-    if (savedImageUrl != null && savedImageUrl.isNotEmpty) {
-      await productImages().put(
-        saved.id,
-        ApiService.resolveBackendUrl(savedImageUrl),
-      );
-    }
-    await importInventoryRemote(
-      item: saved,
-      quantity: quantity,
-      importPrice: importPrice,
-      note: 'Tạo mặt hàng kho',
-    );
-
-    return inventoryProducts().get(saved.id) ?? saved;
-  }
+  }) => CatalogRepository.create(
+    barcode: barcode,
+    name: name,
+    price: price,
+    importPrice: importPrice,
+    unit: unit,
+    quantity: quantity,
+    categoryId: categoryId,
+    imagePath: imagePath,
+  );
 
   static Future<double?> fetchLatestImportPrice(String barcode) {
     return ApiService.fetchInventoryImportPrice(barcode);
@@ -875,49 +637,11 @@ class DBService {
     return null;
   }
 
-  static final Map<String, Future<Product>> _stockTransfers = {};
   static Future<Product> releaseInventoryToShelf({
     required InventoryItem item,
     required int quantity,
     required int categoryId,
-  }) {
-    final key = '${item.id}:$quantity';
-    return _stockTransfers.putIfAbsent(
-      key,
-      () => _releaseInventoryToShelf(
-        item: item,
-        quantity: quantity,
-        categoryId: categoryId,
-      ).whenComplete(() => _stockTransfers.remove(key)),
-    );
-  }
-
-  static Future<Product> _releaseInventoryToShelf({
-    required InventoryItem item,
-    required int quantity,
-    required int categoryId,
-  }) async {
-    final employeeId = settings().get('current_user_id') as int?;
-    if (employeeId == null) throw ApiException('Vui lòng đăng nhập lại');
-    // Keep the same key after a timeout/restart so retry cannot transfer twice.
-    final pendingKey = 'pending_transfer_${item.id}_$quantity';
-    final requestKey =
-        settings().get(pendingKey) as String? ??
-        'transfer_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 32)}';
-    await settings().put(pendingKey, requestKey);
-    final saved = await ApiService.exportInventory(
-      inventoryItemId: item.id,
-      employeeId: employeeId,
-      quantity: quantity,
-      requestKey: requestKey,
-      note: 'Đưa hàng lên kệ',
-    );
-    await syncProductsFromApi();
-    await syncInventoryItemsFromApi();
-    await syncInventoryHistoryFromApi();
-    await settings().delete(pendingKey);
-    return products().get(saved.id) ?? saved;
-  }
+  }) => CatalogRepository.transfer(item: item, quantity: quantity);
 
   static List<Product> searchProducts(String query, List<Product> source) {
     if (query.isEmpty) {

@@ -1,4 +1,6 @@
-# Flutter feature refactor — đợt 1: reports
+# Flutter feature refactor — reports và các đợt tiếp theo
+
+Đợt 2 đã chuyển catalog/kho, giỏ hàng, checkout/payment và Home. Xem [storefront-cache-checkout.md](storefront-cache-checkout.md) cho phạm vi, hàng đợi cache và giới hạn đối soát timeout.
 
 ## Phạm vi đã chuyển
 
@@ -37,9 +39,9 @@ Thay đổi có chủ đích:
 - Chưa thay đổi định nghĩa doanh thu/đơn đủ điều kiện, chưa thay API báo cáo phía backend bằng truy vấn tổng hợp theo kỳ.
 - Chưa có cache báo cáo offline. Nếu bổ sung, cache phải có key gồm user + quyền + bộ lọc, thời điểm cập nhật và nhãn stale rõ ràng; không dùng cache để xác nhận giao dịch.
 
-## Các phần chưa chuyển
+## Lộ trình ghi nhận sau đợt 1 (đợt 2 đã triển khai bên trên)
 
-Home, thanh toán tại quầy, checkout online và các màn kho vẫn ở cấu trúc cũ; ApiService/DBService vẫn còn lớn.
+Tại thời điểm kết thúc đợt 1, Home, thanh toán tại quầy, checkout online và các màn kho còn ở cấu trúc cũ. Đợt 2 đã chuyển các màn chính; ApiService/DBService vẫn giữ facade cho consumer chưa chuyển.
 Không coi đây là hoàn tất refactor toàn bộ Flutter hoặc giải quyết tất cả race cache–API.
 
 Thứ tự tiếp theo:
