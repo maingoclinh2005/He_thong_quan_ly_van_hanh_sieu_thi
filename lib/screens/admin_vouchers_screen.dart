@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/voucher.dart';
 import '../services/voucher_service.dart';
 
 class AdminVouchersScreen extends StatefulWidget {
   final String token;
 
-  const AdminVouchersScreen({Key? key, required this.token}) : super(key: key);
+  const AdminVouchersScreen({super.key, required this.token});
 
   @override
-  _AdminVouchersScreenState createState() => _AdminVouchersScreenState();
+  State<AdminVouchersScreen> createState() => _AdminVouchersScreenState();
 }
 
 class _AdminVouchersScreenState extends State<AdminVouchersScreen> {
@@ -22,55 +23,55 @@ class _AdminVouchersScreenState extends State<AdminVouchersScreen> {
   }
 
   Future<void> _loadVouchers() async {
+    if (!mounted) return;
     setState(() => isLoading = true);
     try {
       final loadedVouchers = await VoucherService.getAllVouchers(widget.token);
+      if (!mounted) return;
       setState(() => vouchers = loadedVouchers);
     } catch (e) {
-      print('Lỗi: $e');
+      if (kDebugMode) debugPrint('Voucher request failed');
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> _deleteVoucher(int id) async {
-    showDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Xóa voucher'),
         content: const Text('Bạn chắc chắn muốn xóa?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Hủy'),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final result = await VoucherService.deleteVoucher(
-                id,
-                widget.token,
-              );
-              if (result['success']) {
-                _loadVouchers();
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('Xóa thành công')));
-              } else {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(result['message'])));
-              }
-            },
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Xóa'),
           ),
         ],
       ),
     );
+    if (!mounted || confirmed != true) return;
+    final result = await VoucherService.deleteVoucher(id, widget.token);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['success'] == true
+              ? 'Xóa thành công'
+              : result['message'].toString(),
+        ),
+      ),
+    );
+    if (result['success'] == true) await _loadVouchers();
   }
 
   Future<void> _viewUsage(int id) async {
     final usage = await VoucherService.getVoucherUsage(id, widget.token);
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -300,10 +301,10 @@ class _AdminVouchersScreenState extends State<AdminVouchersScreen> {
 class CreateVoucherScreen extends StatefulWidget {
   final String token;
 
-  const CreateVoucherScreen({Key? key, required this.token}) : super(key: key);
+  const CreateVoucherScreen({super.key, required this.token});
 
   @override
-  _CreateVoucherScreenState createState() => _CreateVoucherScreenState();
+  State<CreateVoucherScreen> createState() => _CreateVoucherScreenState();
 }
 
 class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
@@ -347,6 +348,7 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
         token: widget.token,
       );
 
+      if (!mounted) return;
       if (result['success']) {
         ScaffoldMessenger.of(
           context,
@@ -358,11 +360,12 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
         ).showSnackBar(SnackBar(content: Text(result['message'])));
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -391,7 +394,7 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: discountType,
+                    initialValue: discountType,
                     decoration: const InputDecoration(labelText: 'Loại giảm'),
                     items: [
                       DropdownMenuItem(
@@ -455,6 +458,7 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
                         firstDate: DateTime.now(),
                         lastDate: DateTime(2030),
                       );
+                      if (!mounted) return;
                       if (date != null) {
                         expiryCtrl.text =
                             '${date.year}-${date.month}-${date.day}';
@@ -491,13 +495,13 @@ class EditVoucherScreen extends StatefulWidget {
   final Voucher voucher;
 
   const EditVoucherScreen({
-    Key? key,
+    super.key,
     required this.token,
     required this.voucher,
-  }) : super(key: key);
+  });
 
   @override
-  _EditVoucherScreenState createState() => _EditVoucherScreenState();
+  State<EditVoucherScreen> createState() => _EditVoucherScreenState();
 }
 
 class _EditVoucherScreenState extends State<EditVoucherScreen> {
@@ -563,6 +567,7 @@ class _EditVoucherScreenState extends State<EditVoucherScreen> {
         token: widget.token,
       );
 
+      if (!mounted) return;
       if (result['success']) {
         ScaffoldMessenger.of(
           context,
@@ -574,11 +579,12 @@ class _EditVoucherScreenState extends State<EditVoucherScreen> {
         ).showSnackBar(SnackBar(content: Text(result['message'])));
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -644,7 +650,7 @@ class _EditVoucherScreenState extends State<EditVoucherScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: status,
+                    initialValue: status,
                     decoration: const InputDecoration(labelText: 'Trạng thái'),
                     items: [
                       DropdownMenuItem(

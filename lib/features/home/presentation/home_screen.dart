@@ -13,7 +13,7 @@ import 'package:sieuthimini/screens/profile_route.dart';
 import 'package:sieuthimini/screens/checkout_screen.dart';
 import 'package:sieuthimini/screens/customer_online_checkout_screen.dart';
 import 'package:sieuthimini/screens/customer_vouchers_screen.dart';
-import 'package:sieuthimini/screens/RevenueOverviewScreen.dart'; // Đã thêm
+import 'package:sieuthimini/screens/revenue_overview_screen.dart'; // Đã thêm
 import 'package:sieuthimini/screens/product_management_screen.dart';
 import 'package:sieuthimini/screens/inventory_management_screen.dart';
 import 'package:sieuthimini/screens/employee.dart';

@@ -133,7 +133,7 @@ class RoleBottomNavigationBar extends StatelessWidget {
                         border: Border.all(color: Colors.white, width: 5),
                         boxShadow: [
                           BoxShadow(
-                            color: _activeColor.withOpacity(0.34),
+                            color: _activeColor.withValues(alpha: 0.34),
                             blurRadius: 18,
                             offset: const Offset(0, 8),
                           ),
@@ -274,7 +274,7 @@ class _BarShell extends StatelessWidget {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 18,
               offset: const Offset(0, -6),
             ),

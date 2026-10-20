@@ -283,6 +283,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (result != null) {
       // If editing, fill fields for manual edit behavior. If adding new,
       // immediately attempt to add product from inventory with chosen qty.
@@ -322,6 +323,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         categoryId: categoryId,
       );
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Thêm sản phẩm thành công!'),
@@ -335,6 +337,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         _selectedInventoryId = null;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi: ${e.toString()}'),
@@ -415,6 +418,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
 
       final importPrice = await DBService.fetchLatestImportPrice(id);
+      if (!mounted) return;
       if (importPrice != null && price < importPrice) {
         throw Exception('Giá bán không được nhỏ hơn giá nhập');
       }
@@ -437,6 +441,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         widget.product!.stockQuantity = stockQuantity; // GHI ĐÈ số lượng
         widget.product!.categoryId = _selectedCategoryId;
         await DBService.updateProductRemote(widget.product!);
+        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -458,6 +463,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         );
 
         await DBService.createProduct(newProduct);
+        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -473,6 +479,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         _idController.clear();
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi: ${e.toString()}'),

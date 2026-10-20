@@ -182,7 +182,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
-                value: _selectedCategoryId,
+                initialValue: _selectedCategoryId,
                 decoration: const InputDecoration(
                   labelText: 'Danh mục *',
                   border: OutlineInputBorder(),
@@ -261,7 +261,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _status,
+                initialValue: _status,
                 decoration: const InputDecoration(
                   labelText: 'Trạng thái bán',
                   border: OutlineInputBorder(),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../models/voucher.dart';
 import 'api_service.dart';
 import 'api_contract.dart';
@@ -97,7 +98,7 @@ class VoucherService {
       }
       return [];
     } catch (e) {
-      print('Lỗi lấy vouchers: $e');
+      if (kDebugMode) debugPrint('Voucher request failed');
       return [];
     }
   }
@@ -123,7 +124,7 @@ class VoucherService {
       }
       return null;
     } catch (e) {
-      print('Lỗi lấy voucher: $e');
+      if (kDebugMode) debugPrint('Voucher request failed');
       return null;
     }
   }
@@ -150,7 +151,7 @@ class VoucherService {
       }
       return [];
     } catch (e) {
-      print('Lỗi lấy vouchers của user: $e');
+      if (kDebugMode) debugPrint('Voucher request failed');
       return [];
     }
   }
@@ -268,7 +269,7 @@ class VoucherService {
       }
       return [];
     } catch (e) {
-      print('Lỗi lấy tất cả vouchers: $e');
+      if (kDebugMode) debugPrint('Voucher request failed');
       return [];
     }
   }
@@ -376,7 +377,7 @@ class VoucherService {
       }
       return [];
     } catch (e) {
-      print('Lỗi lấy lịch sử dùng voucher: $e');
+      if (kDebugMode) debugPrint('Voucher request failed');
       return [];
     }
   }

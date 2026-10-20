@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/voucher.dart';
 import '../services/voucher_service.dart';
 
@@ -8,14 +9,14 @@ class ApplyVoucherScreen extends StatefulWidget {
   final Function(Map<String, dynamic>)? onVoucherApplied;
 
   const ApplyVoucherScreen({
-    Key? key,
+    super.key,
     required this.orderTotal,
     required this.userId,
     this.onVoucherApplied,
-  }) : super(key: key);
+  });
 
   @override
-  _ApplyVoucherScreenState createState() => _ApplyVoucherScreenState();
+  State<ApplyVoucherScreen> createState() => _ApplyVoucherScreenState();
 }
 
 class _ApplyVoucherScreenState extends State<ApplyVoucherScreen> {
@@ -38,15 +39,16 @@ class _ApplyVoucherScreenState extends State<ApplyVoucherScreen> {
     setState(() => isLoading = true);
     try {
       final vouchers = await VoucherService.getAvailableVouchers();
+      if (!mounted) return;
       setState(() {
         availableVouchers = vouchers
             .where((v) => widget.orderTotal >= v.minOrderAmount)
             .toList();
       });
     } catch (e) {
-      print('Lỗi: $e');
+      if (kDebugMode) debugPrint('Voucher request failed');
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -70,6 +72,7 @@ class _ApplyVoucherScreenState extends State<ApplyVoucherScreen> {
         userId: widget.userId,
       );
 
+      if (!mounted) return;
       if (result['success']) {
         try {
           final voucherData = result['data'] as Map<String, dynamic>;
@@ -94,15 +97,17 @@ class _ApplyVoucherScreenState extends State<ApplyVoucherScreen> {
             'finalTotal': widget.orderTotal - discountAmount,
           });
         } catch (e) {
+          if (!mounted) return;
           setState(() => errorMessage = 'Lỗi xử lý dữ liệu: $e');
         }
       } else {
         setState(() => errorMessage = result['message']);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => errorMessage = 'Lỗi: $e');
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 

@@ -8,7 +8,7 @@ import 'package:sieuthimini/features/reports/data/revenue_repository.dart';
 import 'package:sieuthimini/features/reports/data/performance_repository.dart';
 import 'package:sieuthimini/features/reports/domain/report_query.dart';
 import 'package:sieuthimini/models/order.dart';
-import 'package:sieuthimini/screens/RevenueOverviewScreen.dart';
+import 'package:sieuthimini/screens/revenue_overview_screen.dart';
 import 'package:sieuthimini/screens/product_performance_report_screen.dart';
 
 class FakeReportSource implements ReportSource {
