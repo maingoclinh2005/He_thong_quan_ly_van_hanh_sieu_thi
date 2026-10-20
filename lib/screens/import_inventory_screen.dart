@@ -116,6 +116,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (name == null || name.isEmpty) return;
 
     setState(() => _processing = true);
@@ -169,6 +170,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
     final XFile? file = await ImagePicker().pickImage(
       source: ImageSource.gallery,
     );
+    if (!mounted) return;
     if (file != null) {
       setState(() => _pickedImagePath = file.path);
     }
@@ -181,6 +183,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
             _InventoryCodeScannerScreen(initialCode: _searchController.text),
       ),
     );
+    if (!mounted) return;
     if (code != null && code.isNotEmpty) {
       await _lookupCode(code);
     }
@@ -190,8 +193,8 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
     setState(() => _codeLookupLoading = true);
     try {
       final code = await DBService.generateInternalProductCode();
-      _idController.text = code;
       if (!mounted) return;
+      _idController.text = code;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Đã tạo mã nội bộ $code')));
@@ -221,6 +224,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
       }
 
       final result = await ApiService.scanProductCode(normalizedCode);
+      if (!mounted) return;
       final inventoryMap = result['inventory_item'];
       if (inventoryMap is Map) {
         final item = InventoryItem.fromJson(
@@ -330,6 +334,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (result != null) {
       setState(() => _processing = true);
       try {
@@ -340,6 +345,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
           quantity: quantity,
           importPrice: importPrice,
         );
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Đã nhập $quantity vào ${item.name}'),
@@ -347,6 +353,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
           ),
         );
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Lỗi khi nhập hàng: $e'),
@@ -396,6 +403,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
         categoryId: _selectedCategoryId,
         imagePath: _pickedImagePath,
       );
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -414,6 +422,7 @@ class _ImportInventoryScreenState extends State<ImportInventoryScreen> {
       _newFormKey.currentState!.reset();
       _pickedImagePath = null;
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi khi thêm hàng mới: $e'),

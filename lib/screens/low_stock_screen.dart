@@ -38,7 +38,7 @@ class LowStockScreen extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: statusColor.withOpacity(0.3), width: 1.5),
+        side: BorderSide(color: statusColor.withValues(alpha: 0.3), width: 1.5),
       ),
       child: ListTile(
         // onTap: () async {

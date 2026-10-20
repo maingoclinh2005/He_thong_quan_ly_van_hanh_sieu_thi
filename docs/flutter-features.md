@@ -5,7 +5,7 @@
 ## Phạm vi đã chuyển
 
 Hai route cũ vẫn dùng được nhờ file export tương thích:
-- lib/screens/RevenueOverviewScreen.dart → features/reports/presentation/revenue_overview_screen.dart
+- lib/screens/revenue_overview_screen.dart → features/reports/presentation/revenue_overview_screen.dart
 - lib/screens/product_performance_report_screen.dart → features/reports/presentation/product_performance_report_screen.dart
 
 Screen doanh thu từ 1.635 dòng còn khoảng 970; hiệu suất từ 1.517 còn khoảng 411.
@@ -55,7 +55,7 @@ Mỗi phần phải có test trước khi thay đường ghi cache. Không thêm
 ## Kiểm thử
 
 flutter test --no-pub
-flutter analyze --no-pub lib/features/reports lib/screens/RevenueOverviewScreen.dart lib/screens/product_performance_report_screen.dart test/reports_feature_test.dart
+flutter analyze --no-pub lib/features/reports lib/screens/revenue_overview_screen.dart lib/screens/product_performance_report_screen.dart test/reports_feature_test.dart
 
 Test kiểm tra race phản hồi, gộp refresh, retry, dispose, ranh giới kỳ/tháng, giới hạn đồng thời,
 không fallback khi API lỗi, widget loading/error/data và route export.

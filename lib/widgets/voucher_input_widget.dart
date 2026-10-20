@@ -9,15 +9,15 @@ class VoucherInputWidget extends StatefulWidget {
   final bool canRemove;
 
   const VoucherInputWidget({
-    Key? key,
+    super.key,
     required this.orderTotal,
     required this.userId,
     required this.onVoucherChanged,
     this.canRemove = true,
-  }) : super(key: key);
+  });
 
   @override
-  _VoucherInputWidgetState createState() => _VoucherInputWidgetState();
+  State<VoucherInputWidget> createState() => _VoucherInputWidgetState();
 }
 
 class _VoucherInputWidgetState extends State<VoucherInputWidget> {
@@ -45,6 +45,7 @@ class _VoucherInputWidgetState extends State<VoucherInputWidget> {
         userId: widget.userId,
       );
 
+      if (!mounted) return;
       if (result['success']) {
         try {
           final voucherData = result['data'] as Map<String, dynamic>;
@@ -66,15 +67,17 @@ class _VoucherInputWidgetState extends State<VoucherInputWidget> {
             'finalTotal': widget.orderTotal - _discountAmount,
           });
         } catch (e) {
+          if (!mounted) return;
           setState(() => _errorMessage = 'Lỗi xử lý dữ liệu: $e');
         }
       } else {
         setState(() => _errorMessage = result['message']);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _errorMessage = 'Lỗi: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -260,11 +263,11 @@ class VoucherDisplayWidget extends StatelessWidget {
   final Function()? onRemove;
 
   const VoucherDisplayWidget({
-    Key? key,
+    super.key,
     this.voucher,
     this.discountAmount = 0,
     this.onRemove,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -320,11 +323,11 @@ class VoucherChipsWidget extends StatelessWidget {
   final Voucher? selectedVoucher;
 
   const VoucherChipsWidget({
-    Key? key,
+    super.key,
     required this.vouchers,
     required this.onSelect,
     this.selectedVoucher,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

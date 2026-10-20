@@ -1,5 +1,6 @@
 /// Centralized constants for the application
 /// Avoids duplication of constant values across screens
+library;
 
 class AppConstants {
   // Inventory constants

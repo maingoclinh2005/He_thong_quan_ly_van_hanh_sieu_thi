@@ -135,6 +135,7 @@ class _InventoryCheckScreenState extends State<InventoryCheckScreen> {
         note: _noteController.text.trim(),
       );
 
+      if (!mounted) return;
       // 3. Thông báo
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -146,6 +147,7 @@ class _InventoryCheckScreenState extends State<InventoryCheckScreen> {
       );
       Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi khi điều chỉnh kho: ${e.toString()}'),

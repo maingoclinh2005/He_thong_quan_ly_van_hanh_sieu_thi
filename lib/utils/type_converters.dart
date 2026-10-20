@@ -1,5 +1,6 @@
 /// Utility functions for type conversion
 /// Centralized helper methods to avoid code duplication across models
+library;
 
 class TypeConverters {
   /// Convert dynamic value to int with default value

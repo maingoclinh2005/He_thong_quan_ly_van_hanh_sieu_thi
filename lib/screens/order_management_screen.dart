@@ -114,7 +114,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -148,6 +148,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
     }
 
     final cart = await DBService.loadCartForCurrentUser(email);
+    if (!mounted) return;
     if (cart.isEmpty) {
       ScaffoldMessenger.of(
         context,

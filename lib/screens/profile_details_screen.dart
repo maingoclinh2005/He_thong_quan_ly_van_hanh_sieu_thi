@@ -57,6 +57,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
       );
       await DBService.syncUsersFromApi();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e is ApiException ? e.message : 'Lỗi tạo tài khoản'),
@@ -65,6 +66,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
       return;
     }
 
+    if (!mounted) return;
     if (widget.remember) {
       final settings = DBService.settings();
       settings.put('remember_email', widget.email);
@@ -76,8 +78,9 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     ).showSnackBar(const SnackBar(content: Text('Tạo tài khoản thành công')));
 
     // pop twice: close profile details and the register screen to go back to previous flow
-    Navigator.of(context).pop();
-    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    if (navigator.canPop()) navigator.pop();
   }
 
   @override
