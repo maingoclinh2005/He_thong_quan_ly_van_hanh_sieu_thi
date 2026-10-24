@@ -145,7 +145,7 @@ extension _HomeImages on _HomeScreenState {
         stored.trim(),
         fit: BoxFit.cover,
         width: double.infinity,
-        errorBuilder: (c, e, s) => Image.asset(
+        errorBuilder: (c, e, s) => SafeAssetImage(
           _imageFor(p),
           fit: BoxFit.cover,
           width: double.infinity,
@@ -157,7 +157,7 @@ extension _HomeImages on _HomeScreenState {
         stored,
         fit: BoxFit.cover,
         width: double.infinity,
-        errorBuilder: (c, e, s) => Image.asset(
+        errorBuilder: (c, e, s) => SafeAssetImage(
           _imageFor(p),
           fit: BoxFit.cover,
           width: double.infinity,
@@ -173,7 +173,7 @@ extension _HomeImages on _HomeScreenState {
             file,
             fit: BoxFit.cover,
             width: double.infinity,
-            errorBuilder: (c, e, s) => Image.asset(
+            errorBuilder: (c, e, s) => SafeAssetImage(
               _imageFor(p),
               fit: BoxFit.cover,
               width: double.infinity,
@@ -185,18 +185,10 @@ extension _HomeImages on _HomeScreenState {
       }
     }
 
-    return Image.asset(
+    return SafeAssetImage(
       _imageFor(p),
       fit: BoxFit.cover,
       width: double.infinity,
-      errorBuilder: (c, e, s) => Container(
-        color: Colors.grey.shade100,
-        child: Image.asset(
-          ProductAssetResolver.defaultProductAsset,
-          fit: BoxFit.cover,
-          width: double.infinity,
-        ),
-      ),
     );
   }
 }

@@ -187,13 +187,7 @@ class DBService {
       return;
     }
 
-    await Future.wait([
-      syncProductsFromApi(),
-      syncInventoryItemsFromApi(),
-      syncUsersFromApi(),
-      syncOrdersFromApi(),
-      syncInventoryHistoryFromApi(),
-    ]);
+    await StoreCacheRepository.syncAll();
   }
 
   static Future<void> syncProductsFromApi() => StoreCacheRepository.products();

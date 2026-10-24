@@ -29,6 +29,7 @@ import 'package:sieuthimini/screens/admin_vouchers_screen.dart';
 import 'package:sieuthimini/screens/login_screen.dart';
 import 'package:sieuthimini/widgets/role_bottom_navigation_bar.dart';
 import 'package:sieuthimini/widgets/product_list_card.dart';
+import 'package:sieuthimini/widgets/safe_asset_image.dart';
 import 'package:sieuthimini/widgets/slide_page_route.dart';
 import 'package:sieuthimini/screens/product_detail_screen.dart';
 import 'package:sieuthimini/utils/product_asset_resolver.dart';
