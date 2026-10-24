@@ -28,6 +28,7 @@ class StoreCacheRepository {
 
   static Future<void> syncAll() => Future.wait([
     products(),
+    profile(),
     inventory(),
     users(),
     orders(),
@@ -86,6 +87,12 @@ class StoreCacheRepository {
     (items) => replace(DBService.users(), {
       for (final item in items) item.email: item,
     }),
+  );
+
+  static Future<void> profile() => _refresh(
+    'profile',
+    ApiService.fetchCurrentProfile,
+    (user) => DBService.users().put(user.email, user),
   );
 
   static Future<List<Order>> _fetchOrders() async {

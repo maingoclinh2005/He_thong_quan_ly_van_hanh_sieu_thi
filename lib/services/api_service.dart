@@ -266,6 +266,14 @@ class ApiService {
     _decode(response);
   }
 
+  static Future<User> fetchCurrentProfile() async {
+    final response = await client
+        .get(_uri('/api/auth/profile'), headers: _authHeaders)
+        .timeout(_timeout);
+    final body = _decode(response) as Map;
+    return User.fromJson(Map<String, dynamic>.from(body['data'] as Map));
+  }
+
   static Future<List<User>> fetchUsers() async {
     final response = await client
         .get(_uri('/api/users'), headers: _authHeaders)

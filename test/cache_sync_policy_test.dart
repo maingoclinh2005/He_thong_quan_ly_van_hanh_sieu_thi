@@ -8,16 +8,18 @@ void main() {
       'products',
     });
   });
-  test('customer and unknown roles only sync public catalog', () {
+  test('authenticated customer can sync own profile without user list', () {
     for (final role in ['customer', 'unknown', null]) {
       expect(CacheSyncPolicy.resources(authenticated: true, role: role), {
         'products',
+        'profile',
       });
     }
   });
   test('employee excludes admin user list', () {
     expect(CacheSyncPolicy.resources(authenticated: true, role: 'employee'), {
       'products',
+      'profile',
       'inventory',
       'history',
       'orders',
@@ -26,6 +28,7 @@ void main() {
   test('admin syncs all supported resources', () {
     expect(CacheSyncPolicy.resources(authenticated: true, role: 'admin'), {
       'products',
+      'profile',
       'inventory',
       'history',
       'orders',
