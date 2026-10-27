@@ -19,7 +19,7 @@ class CacheSyncBanner extends StatelessWidget {
                 tooltip: 'Đồng bộ lại',
                 icon: const Icon(Icons.refresh),
                 onPressed: () =>
-                    StoreCacheRepository.refreshAfterWrite(warehouse: true),
+                    StoreCacheRepository.retrySync(),
               ),
             ),
           ),

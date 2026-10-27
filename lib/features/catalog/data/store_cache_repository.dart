@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'cache_sync_policy.dart';
 import '../../../core/data/cache_coordinator.dart';
 import '../../../models/inventory_history_entry.dart';
 import '../../../models/order.dart';
@@ -8,6 +9,40 @@ import '../../../services/token_store.dart';
 import '../../../utils/type_converters.dart';
 
 class StoreCacheRepository {
+  static Set<String> get allowedResources => CacheSyncPolicy.resources(
+    authenticated: TokenStore.instance.hasSession,
+    role: DBService.settings().get('current_role')?.toString(),
+  );
+
+  static Future<void> _refresh<T>(
+    String key,
+    Future<T> Function() fetch,
+    Future<void> Function(T) apply,
+  ) {
+    if (!allowedResources.contains(key)) {
+      coordinator.dismissError(key);
+      return Future.value();
+    }
+    return coordinator.refresh(key, fetch, apply);
+  }
+
+  static Future<void> syncAll() => Future.wait([
+    products(),
+    profile(),
+    inventory(),
+    users(),
+    orders(),
+    history(),
+  ]).then((_) {});
+
+  static Future<void> retrySync() async {
+    try {
+      await syncAll();
+    } catch (_) {
+      // Each failed read remains visible; never replay a transaction.
+    }
+  }
+
   static final coordinator = CacheCoordinator(
     scope: () =>
         '${TokenStore.instance.generation}:${DBService.currentUserId()}',
@@ -23,7 +58,7 @@ class StoreCacheRepository {
   }
 
   static Future<void> products() =>
-      coordinator.refresh('products', ApiService.fetchProducts, (items) async {
+      _refresh('products', ApiService.fetchProducts, (items) async {
         await replace(DBService.products(), {
           for (final item in items) item.id: item,
         });
@@ -39,22 +74,25 @@ class StoreCacheRepository {
         }
       });
 
-  static Future<void> inventory() => coordinator.refresh(
-    'inventory',
-    ApiService.fetchInventoryItems,
-    (items) async {
-      await replace(DBService.inventoryProducts(), {
-        for (final item in items) item.id: item,
+  static Future<void> inventory() =>
+      _refresh('inventory', ApiService.fetchInventoryItems, (items) async {
+        await replace(DBService.inventoryProducts(), {
+          for (final item in items) item.id: item,
+        });
       });
-    },
-  );
 
-  static Future<void> users() => coordinator.refresh(
+  static Future<void> users() => _refresh(
     'users',
     ApiService.fetchUsers,
     (items) => replace(DBService.users(), {
       for (final item in items) item.email: item,
     }),
+  );
+
+  static Future<void> profile() => _refresh(
+    'profile',
+    ApiService.fetchCurrentProfile,
+    (user) => DBService.users().put(user.email, user),
   );
 
   static Future<List<Order>> _fetchOrders() async {
@@ -73,14 +111,14 @@ class StoreCacheRepository {
     return details;
   }
 
-  static Future<void> orders() => coordinator.refresh(
+  static Future<void> orders() => _refresh(
     'orders',
     _fetchOrders,
     (items) =>
         replace(DBService.orders(), {for (final item in items) item.id: item}),
   );
 
-  static Future<void> history() => coordinator.refresh(
+  static Future<void> history() => _refresh(
     'history',
     ApiService.fetchInventoryLogs,
     (logs) async {

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/data/cache_coordinator.dart';
 import '../features/cart/data/cart_repository.dart';
 import '../features/checkout/data/checkout_repository.dart';
 import '../features/catalog/data/catalog_repository.dart';
@@ -187,13 +188,7 @@ class DBService {
       return;
     }
 
-    await Future.wait([
-      syncProductsFromApi(),
-      syncInventoryItemsFromApi(),
-      syncUsersFromApi(),
-      syncOrdersFromApi(),
-      syncInventoryHistoryFromApi(),
-    ]);
+    await StoreCacheRepository.syncAll();
   }
 
   static Future<void> syncProductsFromApi() => StoreCacheRepository.products();
@@ -202,6 +197,15 @@ class DBService {
       StoreCacheRepository.inventory();
 
   static Future<void> syncUsersFromApi() => StoreCacheRepository.users();
+
+  /// The login response already contains the authenticated user's public profile.
+  /// Keep it even when a subsequent background API refresh is unavailable.
+  static Future<void> cacheLoginProfile(Map<String, dynamic> data) async {
+    final user = User.fromJson(data);
+    user.password = '';
+    if (user.userId != currentUserId()) throw const SessionChanged();
+    await users().put(user.email, user);
+  }
 
   static Future<User> updateCurrentUserProfile({
     required User user,

@@ -71,6 +71,7 @@ class _PasswordLoginScreenState extends State<PasswordLoginScreen> {
       );
       await settings2.put('current_role', role);
       try {
+        await DBService.cacheLoginProfile(user);
         await DBService.syncAllFromApi();
       } catch (syncError) {
         debugPrint('Đăng nhập thành công nhưng đồng bộ API lỗi: $syncError');

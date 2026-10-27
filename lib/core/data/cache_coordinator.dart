@@ -15,6 +15,10 @@ class CacheCoordinator extends ChangeNotifier {
   final Map<String, Object> _errors = {};
   Map<String, Object> get errors => Map.unmodifiable(_errors);
   int _revision = 0;
+  void dismissError(String key) {
+    if (_errors.remove(key) != null) notifyListeners();
+  }
+
   Future<T> serial<T>(Future<T> Function() work) {
     final result = _tail.then((_) => work());
     _tail = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
