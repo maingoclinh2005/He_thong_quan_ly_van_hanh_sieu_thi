@@ -1,5 +1,5 @@
 import '../../../core/data/cache_coordinator.dart';
-import 'dart:math';
+import 'transfer_request_key.dart';
 import '../../../models/product.dart';
 import '../../../models/inventory_item.dart';
 import '../../../services/api_service.dart';
@@ -187,7 +187,7 @@ class CatalogRepository {
         final requestKey =
             DBService.settings().get(pendingKey) as String? ??
             DBService.settings().get(legacyKey) as String? ??
-            'transfer_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 32)}';
+            createTransferRequestKey();
         await DBService.settings().put(pendingKey, requestKey);
         if (StoreCacheRepository.coordinator.scope() != owner) {
           throw const SessionChanged();
